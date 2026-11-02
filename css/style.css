@@ -144,3 +144,4 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .plan p{color:var(--muted);font-size:.9rem}
 .plan .off{position:absolute;top:14px;right:14px;font-size:.72rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--rose);color:var(--rose-ink)}
 .rules{margin:0 0 28px;padding-left:1.2em;color:var(--muted);font-size:.92rem;display:flex;flex-direction:column;gap:4px}
+@media (max-width:720px){header.top nav a[data-account]{display:inline}}

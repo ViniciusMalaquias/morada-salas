@@ -232,36 +232,97 @@
     $("#btn-send").disabled = !(r.slots.length || plan === "pacote");
   }
 
-  // ---------- dados e envio ----------
+  // ---------- dados, conta e envio ----------
   $("#f-prof").innerHTML = [...(C.publico_lista || []), "Outra área da saúde"].map(p => `<option>${esc(p)}</option>`).join("");
+  $("#regras").innerHTML = (C.regras || []).map(r => `<li>${esc(r)}</li>`).join("");
   const showErr = msg => { const e = $("#sum-err"); e.textContent = msg; e.hidden = false; };
   const hideErr = () => { $("#sum-err").hidden = true; };
+  const sb = M.client;
+  let authMode = "guest", user = null;
+  const HINT = {
+    guest: "Sem cadastro. Você acompanha a reserva pelo código e pelo WhatsApp.",
+    login: "Entre para ver todas as suas reservas num lugar só.",
+    signup: "Crie a conta junto com a reserva: preencha os dados abaixo e escolha uma senha."
+  };
+  function setMode(m) {
+    authMode = m;
+    document.querySelectorAll("#auth-pick .seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.m === m));
+    $("#m-hint").textContent = HINT[m] || "";
+    $("#login-box").hidden = m !== "login";
+    $("#f-res").hidden = m === "login";
+    $("#pass-wrap").hidden = m !== "signup";
+    $("#f-email-label").textContent = m === "signup" ? "E-mail" : "E-mail (opcional)";
+  }
+  document.querySelectorAll("#auth-pick .seg button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
+
+  async function useUser(u) {
+    user = u; if (!u) { $("#who").hidden = true; $("#auth-pick").hidden = false; $("#f-email").disabled = false; setMode("guest"); return; }
+    const p = await M.getProfile();
+    $("#who-name").textContent = p?.nome || u.email; $("#who-email").textContent = p?.nome ? `(${u.email})` : "";
+    $("#who").hidden = false; $("#auth-pick").hidden = true;
+    authMode = "user"; $("#f-res").hidden = false; $("#pass-wrap").hidden = true;
+    if (p?.nome) $("#f-nome").value = p.nome;
+    if (p?.telefone) $("#f-tel").value = p.telefone;
+    if (p?.profissao) $("#f-prof").value = p.profissao;
+    if (p?.registro) $("#f-reg").value = p.registro;
+    $("#f-email").value = u.email; $("#f-email").disabled = true;
+  }
+  if (sb) useUser(await M.getUser());
+  $("#who-out").onclick = async () => { await sb.auth.signOut(); useUser(null); };
+  $("#a-login").onclick = async () => {
+    const e = $("#a-err"); e.hidden = true;
+    const { data, error } = await sb.auth.signInWithPassword({ email: $("#a-email").value.trim(), password: $("#a-pass").value });
+    if (error) { e.textContent = /confirm/i.test(error.message) ? "Confirme seu e-mail pelo link que enviamos antes de entrar." : "E-mail ou senha incorretos."; e.hidden = false; return; }
+    useUser(data.user);
+  };
 
   $("#btn-send").addEventListener("click", async () => {
     const r = compute(); if (!r) return;
-    const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim();
+    const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim(), email = $("#f-email").value.trim();
     if (!r.slots.length && plan !== "pacote") return showErr("Escolha pelo menos um horário.");
+    if (authMode === "login") return showErr("Entre na sua conta ou escolha Continuar como visitante.");
     if (!nome) { $("#f-nome").focus(); return showErr("Preencha seu nome no passo 3."); }
     if (tel.replace(/\D/g, "").length < 10) { $("#f-tel").focus(); return showErr("Preencha seu WhatsApp com DDD no passo 3."); }
-    if (!M.client) return showErr("O site está em modo demonstração e não recebe reservas.");
+    if (authMode === "signup" && !/^\S+@\S+\.\S+$/.test(email)) { $("#f-email").focus(); return showErr("Preencha seu e-mail para criar a conta."); }
+    if (authMode === "signup" && $("#f-pass").value.length < 8) { $("#f-pass").focus(); return showErr("A senha precisa ter pelo menos 8 caracteres."); }
+    if (!$("#f-aceite").checked) { $("#f-aceite").focus(); return showErr("Para reservar, marque que você aceita as regras de uso."); }
+    if (!sb) return showErr("O site está em modo demonstração e não recebe reservas.");
     hideErr();
     const btn = $("#btn-send"); btn.disabled = true; btn.textContent = "Enviando…";
+    const reset = () => { btn.disabled = false; btn.textContent = "Enviar pré-reserva"; };
+
+    let pendingConfirm = false;
+    if (authMode === "signup") {
+      const { data, error } = await sb.auth.signUp({ email, password: $("#f-pass").value, options: {
+        emailRedirectTo: new URL("conta.html", location.href).href,
+        data: { nome, telefone: tel, profissao: $("#f-prof").value, registro: $("#f-reg").value.trim() } } });
+      if (error) { reset(); return showErr(/registered|exists/i.test(error.message) ? "Já existe uma conta com esse e-mail. Use a opção Entrar." : `Não foi possível criar a conta: ${error.message}`); }
+      if (data.session) user = data.user; else pendingConfirm = true;
+    }
+
     const resumo = [`Plano: ${r.planName}`, ...r.lines, `${r.totalLabel}: ${M.money(r.total)}`].join("\n");
-    const { data, error } = await M.client.rpc("create_reservation", { p: {
-      room_id: room.id, plano: plan, nome, telefone: tel,
-      email: $("#f-email").value.trim(), profissao: $("#f-prof").value,
-      registro: $("#f-reg").value.trim(), obs: $("#f-obs").value.trim(),
-      total: Math.round(r.total * 100) / 100, resumo, slots: r.slots
+    const { data, error } = await sb.rpc("request_reservation", { p: {
+      room_id: room.id, plano: plan, nome, telefone: tel, email,
+      profissao: $("#f-prof").value, registro: $("#f-reg").value.trim(), obs: $("#f-obs").value.trim(),
+      total: Math.round(r.total * 100) / 100, resumo, slots: r.slots, aceite: "true"
     }});
-    btn.textContent = "Enviar pré-reserva";
+    reset();
     if (error) {
-      btn.disabled = false;
       showErr(error.message || "Não foi possível enviar. Tente de novo.");
       if (/reservado/.test(error.message || "")) { sel.clear(); occ = {}; refresh(); }
       return;
     }
-    const code = String(data).slice(0, 8).toUpperCase();
+    const code = data.codigo;
+    const prazo = Number(C.prazo_pagamento_horas || 24);
+    const ate = M.fmtDateTime(new Date(Date.now() + prazo * 3600e3));
     $("#done-code").textContent = code;
+    $("#done-pay").innerHTML = `
+      <p><b>Pague até ${ate}</b> para garantir o horário. Valor: <b>${M.money(r.total)}</b>${mode() === "fixo" ? " por mês (estimativa)" : ""}.</p>
+      ${C.pix_chave ? `<p>Pix (${esc(C.pix_nome || "")}): <code>${esc(C.pix_chave)}</code></p>` : ""}
+      <p class="muted small">${esc(C.pagamento_texto || "")}</p>`;
+    $("#done-note").textContent = pendingConfirm
+      ? `Sua conta foi criada. Confirme o e-mail que enviamos para ${email}; depois de entrar, esta reserva aparece em Minha conta.`
+      : user ? "Você acompanha esta reserva em Minha conta." : "Guarde o código: com ele e seu WhatsApp você acompanha a reserva em Minha conta.";
     $("#done-wa").href = wa(`Olá! Fiz uma pré-reserva pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nNome: ${nome}`);
     document.querySelector(".booking").hidden = true;
     $("#done").hidden = false;

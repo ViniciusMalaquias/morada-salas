@@ -121,3 +121,15 @@ table.agcal{border-collapse:separate;border-spacing:3px;width:100%;min-width:520
 }
 
 .agcal thead th:first-child{width:42px}
+.tag{font-size:.72rem;font-weight:600;padding:.15em .6em;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.warn{color:var(--accent)}
+.res.st-expirada{border-left-color:var(--muted);opacity:.85}
+.payform{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end;width:100%}
+.payform .row-actions{grid-column:1/-1}
+.payform select,.payform input{font:inherit;padding:.55em .7em;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+@media (max-width:640px){.payform{grid-template-columns:minmax(0,1fr)}}
+.narrow-g{max-width:640px}
+.staff-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px}
+.staff-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.staff-list li:last-child{border-bottom:0}
+.staff-add{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}

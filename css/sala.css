@@ -87,3 +87,23 @@ table.cal{border-collapse:separate;border-spacing:4px;width:100%;min-width:420px
 .small{font-size:.8rem}
 .done{display:flex;flex-direction:column;gap:12px;align-items:flex-start;max-width:560px}
 .done .btn{min-width:220px}
+
+/* passo 3: conta ou visitante */
+.seg{display:flex;flex-wrap:wrap;gap:4px;background:var(--surface);border-radius:14px;padding:4px;align-self:flex-start}
+.seg button{border:0;background:none;padding:.55em 1.1em;border-radius:10px;font:600 .88rem var(--body);color:var(--muted);cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+#auth-pick{display:flex;flex-direction:column;gap:10px}
+.login-box{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+.login-box .err{grid-column:1/-1}
+@media (max-width:640px){.login-box{grid-template-columns:minmax(0,1fr)}}
+.who{background:var(--rose-soft);border-radius:10px;padding:10px 14px;font-size:.92rem}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline}
+.aceite{display:flex;flex-direction:column;gap:6px}
+.check{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:.92rem}
+.check input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--rose)}
+.aceite .rules{margin:0 0 0 28px}
+.btn.small{padding:.6em 1em;font-size:.88rem}
+.paybox{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;width:100%}
+.paybox p{margin:0}
+.paybox code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:.15em .45em;overflow-wrap:anywhere}
+.row-actions{display:flex;gap:10px;flex-wrap:wrap}

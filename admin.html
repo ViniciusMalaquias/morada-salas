@@ -57,11 +57,19 @@
   </section>
 
   <!-- painel -->
+  <!-- conta sem acesso -->
+  <section class="panel narrow" id="v-noaccess" hidden>
+    <h2>Esta conta não tem acesso ao painel</h2>
+    <p class="muted">O painel é só para a equipe da clínica. Se você trabalha na clínica, peça para alguém da equipe liberar seu e-mail na aba Equipe.</p>
+    <div class="row-actions"><a class="btn" href="conta.html">Ir para Minha conta</a><button class="btn ghost" type="button" id="noaccess-out">Sair</button></div>
+  </section>
+
   <section id="v-app" hidden>
     <div class="tabs" role="tablist">
       <button role="tab" id="t-reservas" aria-selected="true" aria-controls="p-reservas">Reservas <span class="count" id="pend-count" hidden></span></button>
       <button role="tab" id="t-salas" aria-selected="false" aria-controls="p-salas">Salas</button>
       <button role="tab" id="t-textos" aria-selected="false" aria-controls="p-textos">Textos, preços e horários</button>
+      <button role="tab" id="t-equipe" aria-selected="false" aria-controls="p-equipe">Equipe</button>
     </div>
 
     <div id="p-reservas" role="tabpanel" aria-labelledby="t-reservas">
@@ -112,6 +120,18 @@
         <button class="btn" id="add-room" type="button">+ Adicionar sala</button>
       </div>
       <div id="room-list" class="room-list"></div>
+    </div>
+
+    <div id="p-equipe" role="tabpanel" aria-labelledby="t-equipe" hidden>
+      <div class="group narrow-g">
+        <h3>Quem acessa o painel</h3>
+        <p class="muted small">Para dar acesso a alguém, a pessoa primeiro cria uma conta em "Entrar" no site. Depois é só adicionar o e-mail dela aqui.</p>
+        <ul class="staff-list" id="staff-list"></ul>
+        <form class="staff-add" id="f-staff" novalidate>
+          <div class="field"><label for="st-email">E-mail da pessoa</label><input id="st-email" type="email" required></div>
+          <button class="btn" type="submit">Dar acesso</button>
+        </form>
+      </div>
     </div>
 
     <div id="p-textos" role="tabpanel" aria-labelledby="t-textos" hidden>

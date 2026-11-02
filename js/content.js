@@ -48,6 +48,11 @@
     semanal_1: 38,
     semanal_4: 35,
     semanal_8: 32,
+    // Pagamento (sem cobrança online: Pix, link ou combinado pelo WhatsApp)
+    prazo_pagamento_horas: 24,
+    pix_chave: "",
+    pix_nome: "Clínica Morada do Ser",
+    pagamento_texto: "Pague por Pix ou peça um link de pagamento pelo WhatsApp. Depois de pagar, envie o comprovante pelo WhatsApp com o código da reserva.",
     whatsapp: "5511953063868",
     telefone: "(11) 95306-3868",
     email: "clinica.moradadoser@gmail.com",
@@ -82,6 +87,12 @@
       { key: "semanal_4", label: "Fixo semanal, 4 a 7h por semana (R$ por hora)", type: "money" },
       { key: "semanal_8", label: "Fixo semanal, 8h ou mais por semana (R$ por hora)", type: "money" },
       { key: "regras", label: "Regras de uso (uma por linha)", type: "list" }
+    ]},
+    { group: "Pagamento", fields: [
+      { key: "prazo_pagamento_horas", label: "Prazo para pagar a pré-reserva (horas)", type: "number", min: 1, max: 168, hint: "Depois desse prazo sem pagamento, o horário volta a aparecer livre no site." },
+      { key: "pix_chave", label: "Chave Pix", type: "text", hint: "Aparece para o cliente na área dele e na mensagem de pagamento." },
+      { key: "pix_nome", label: "Nome do recebedor do Pix", type: "text" },
+      { key: "pagamento_texto", label: "Instruções de pagamento", type: "textarea" }
     ]},
     { group: "Horário de funcionamento", fields: [
       { key: "horarios", label: "Dias e horários", type: "hours" },
@@ -190,9 +201,40 @@
     return out;
   }
 
+  // ---------- contas ----------
+  async function getUser() {
+    if (!client) return null;
+    const { data } = await client.auth.getSession();
+    return data.session?.user || null;
+  }
+  async function getProfile() {
+    const u = await getUser(); if (!u) return null;
+    const { data } = await client.from("profiles").select("*").eq("id", u.id).maybeSingle();
+    return { ...(data || {}), id: u.id, email: u.email };
+  }
+  const STATUS_CLIENTE = { pendente: "Aguardando pagamento", confirmada: "Confirmada", recusada: "Recusada", cancelada: "Cancelada", expirada: "Prazo de pagamento vencido" };
+  // status mostrado: pendente vencido vira "expirada"
+  function statusOf(r, C) {
+    if (r.status !== "pendente") return r.status;
+    const prazo = Number(C?.prazo_pagamento_horas || 24);
+    return new Date(r.created_at).getTime() + prazo * 3600e3 < Date.now() ? "expirada" : "pendente";
+  }
+  const expiresAt = (r, C) => new Date(new Date(r.created_at).getTime() + Number(C?.prazo_pagamento_horas || 24) * 3600e3);
+  const fmtDateTime = d => d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  // Link "Entrar / Minha conta" no topo das páginas públicas
+  async function paintAccountLinks() {
+    const els = document.querySelectorAll("[data-account]"); if (!els.length) return;
+    const u = await getUser().catch(() => null);
+    els.forEach(a => { a.href = "conta.html"; a.textContent = u ? "Minha conta" : "Entrar"; });
+  }
+  if (client) client.auth.onAuthStateChange(() => paintAccountLinks());
+  document.addEventListener("DOMContentLoaded", paintAccountLinks);
+
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
-    money, pct, plans, semanalRate, ranges, iso, parse, addDays, monday, br, pad
+    money, pct, plans, semanalRate, ranges, iso, parse, addDays, monday, br, pad,
+    getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };
 })();

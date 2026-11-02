@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Minha conta · Morada do Ser</title>
+<link rel="icon" href="img/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/conta.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Clínica Morada do Ser, página inicial">
+      <span class="logo" aria-hidden="true"></span>
+      <span><b>Clínica</b><em>Morada do Ser</em></span>
+    </a>
+    <nav>
+      <a href="index.html#salas">Salas</a>
+      <a href="index.html#planos">Planos</a>
+      <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap acc">
+  <!-- deslogado -->
+  <section id="v-out" hidden>
+    <div class="acc-grid">
+      <div class="card acc-card">
+        <div class="seg" role="tablist" aria-label="Acesso">
+          <button type="button" role="tab" data-t="login" aria-selected="true">Entrar</button>
+          <button type="button" role="tab" data-t="signup" aria-selected="false">Criar conta</button>
+        </div>
+
+        <form id="f-login" class="stack" novalidate>
+          <div class="field"><label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="l-pass">Senha</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+          <p class="err" id="l-err" hidden></p>
+          <button class="btn" type="submit">Entrar</button>
+          <button class="linkbtn" type="button" id="l-forgot">Esqueci minha senha</button>
+        </form>
+
+        <form id="f-signup" class="stack" novalidate hidden>
+          <div class="field"><label for="s-nome">Nome completo</label><input id="s-nome" type="text" autocomplete="name" required></div>
+          <div class="field"><label for="s-tel">WhatsApp com DDD</label><input id="s-tel" type="tel" autocomplete="tel" placeholder="(11) 90000-0000" required></div>
+          <div class="field"><label for="s-prof">Profissão</label><select id="s-prof"></select></div>
+          <div class="field"><label for="s-reg">Registro profissional (opcional)</label><input id="s-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
+          <div class="field"><label for="s-email">E-mail</label><input id="s-email" type="email" autocomplete="email" required></div>
+          <div class="field"><label for="s-pass">Senha (mínimo 8 caracteres)</label><input id="s-pass" type="password" autocomplete="new-password" minlength="8" required></div>
+          <p class="err" id="s-err" hidden></p>
+          <button class="btn" type="submit">Criar conta</button>
+        </form>
+        <p class="ok" id="s-ok" hidden></p>
+      </div>
+
+      <div class="card acc-card">
+        <h2 class="h3">Reservou sem conta?</h2>
+        <p class="muted">Consulte o andamento com o código da reserva e o WhatsApp que você informou.</p>
+        <form id="f-code" class="stack" novalidate>
+          <div class="field"><label for="c-code">Código da reserva</label><input id="c-code" type="text" autocapitalize="characters" placeholder="Ex.: 3F9A1C2B" required></div>
+          <div class="field"><label for="c-tel">WhatsApp</label><input id="c-tel" type="tel" placeholder="(11) 90000-0000" required></div>
+          <p class="err" id="c-err" hidden></p>
+          <button class="btn ghost" type="submit">Consultar</button>
+        </form>
+        <div id="c-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- nova senha -->
+  <section id="v-reset" hidden>
+    <div class="card acc-card narrow">
+      <h2 class="h3">Criar nova senha</h2>
+      <form id="f-reset" class="stack" novalidate>
+        <div class="field"><label for="r-pass">Nova senha (mínimo 8 caracteres)</label><input id="r-pass" type="password" autocomplete="new-password" minlength="8" required></div>
+        <p class="err" id="r-err" hidden></p>
+        <button class="btn" type="submit">Salvar senha</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- logado -->
+  <section id="v-in" hidden>
+    <div class="acc-head">
+      <div>
+        <span class="eyebrow">Minha conta</span>
+        <h1 id="hello">Olá!</h1>
+      </div>
+      <div class="acc-actions">
+        <a class="btn" href="index.html#salas">Nova reserva</a>
+        <a class="btn ghost" href="admin.html" id="to-admin" hidden>Painel da equipe</a>
+        <button class="btn ghost" type="button" id="logout">Sair</button>
+      </div>
+    </div>
+
+    <div class="tabs-c" role="tablist">
+      <button role="tab" data-p="p-res" aria-selected="true">Minhas reservas</button>
+      <button role="tab" data-p="p-dados" aria-selected="false">Meus dados</button>
+    </div>
+
+    <div id="p-res">
+      <div id="my-list" class="my-list"><p class="muted">Carregando…</p></div>
+      <details class="card claim">
+        <summary>Fez uma reserva antes de criar a conta? Vincule aqui</summary>
+        <form id="f-claim" class="claim-form" novalidate>
+          <div class="field"><label for="k-code">Código da reserva</label><input id="k-code" type="text" autocapitalize="characters" required></div>
+          <div class="field"><label for="k-tel">WhatsApp usado na reserva</label><input id="k-tel" type="tel" required></div>
+          <button class="btn ghost" type="submit">Vincular</button>
+        </form>
+        <p class="err" id="k-err" hidden></p>
+      </details>
+    </div>
+
+    <div id="p-dados" hidden>
+      <form id="f-perfil" class="card stack narrow" novalidate>
+        <div class="field"><label for="p-nome">Nome completo</label><input id="p-nome" type="text" autocomplete="name"></div>
+        <div class="field"><label for="p-tel">WhatsApp com DDD</label><input id="p-tel" type="tel" autocomplete="tel"></div>
+        <div class="field"><label for="p-prof">Profissão</label><select id="p-prof"></select></div>
+        <div class="field"><label for="p-reg">Registro profissional</label><input id="p-reg" type="text"></div>
+        <div class="field"><label for="p-email">E-mail</label><input id="p-email" type="email" disabled></div>
+        <button class="btn" type="submit">Salvar dados</button>
+        <p class="muted small">Para excluir sua conta e seus dados, peça pelo WhatsApp da clínica.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<footer>
+  <div class="wrap">
+    <span data-c="rodape"></span>
+    <a href="admin.html">Área da equipe</a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="js/conta.js"></script>
+</body>
+</html>

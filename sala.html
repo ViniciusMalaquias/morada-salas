@@ -22,6 +22,7 @@
     <nav>
       <a href="index.html#salas">Todas as salas</a>
       <a href="index.html#planos">Planos</a>
+      <a data-account href="conta.html">Entrar</a>
       <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
     </nav>
   </div>
@@ -70,13 +71,33 @@
 
           <div class="step" id="step-data" hidden>
             <h3><span class="n">3</span> Seus dados</h3>
+            <div class="who" id="who" hidden>Reservando como <b id="who-name"></b> <span class="muted" id="who-email"></span> · <button type="button" class="linkbtn" id="who-out">Não é você? Sair</button></div>
+            <div id="auth-pick">
+              <div class="seg" role="tablist" aria-label="Como você quer reservar">
+                <button type="button" role="tab" data-m="guest" aria-selected="true">Continuar como visitante</button>
+                <button type="button" role="tab" data-m="login" aria-selected="false">Entrar</button>
+                <button type="button" role="tab" data-m="signup" aria-selected="false">Criar conta</button>
+              </div>
+              <p class="muted small" id="m-hint">Sem cadastro. Você acompanha a reserva pelo código e pelo WhatsApp.</p>
+              <div class="login-box" id="login-box" hidden>
+                <div class="field"><label for="a-email">E-mail</label><input id="a-email" type="email" autocomplete="username"></div>
+                <div class="field"><label for="a-pass">Senha</label><input id="a-pass" type="password" autocomplete="current-password"></div>
+                <button type="button" class="btn small" id="a-login">Entrar</button>
+                <p class="err" id="a-err" hidden></p>
+              </div>
+            </div>
             <form id="f-res" class="form-grid" novalidate>
               <div class="field"><label for="f-nome">Nome completo</label><input id="f-nome" type="text" autocomplete="name" required></div>
               <div class="field"><label for="f-tel">WhatsApp com DDD</label><input id="f-tel" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 90000-0000" required></div>
-              <div class="field"><label for="f-email">E-mail (opcional)</label><input id="f-email" type="email" autocomplete="email"></div>
+              <div class="field"><label for="f-email" id="f-email-label">E-mail (opcional)</label><input id="f-email" type="email" autocomplete="email"></div>
+              <div class="field" id="pass-wrap" hidden><label for="f-pass">Crie uma senha (mínimo 8 caracteres)</label><input id="f-pass" type="password" autocomplete="new-password" minlength="8"></div>
               <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
               <div class="field"><label for="f-reg">Registro profissional (opcional)</label><input id="f-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
               <div class="field wide"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" rows="2"></textarea></div>
+              <div class="wide aceite">
+                <label class="check"><input type="checkbox" id="f-aceite"> <span>Li e aceito as regras de uso e autorizo a clínica a usar meus dados para gerenciar a reserva.</span></label>
+                <ul class="rules small" id="regras"></ul>
+              </div>
             </form>
           </div>
         </div>
@@ -94,10 +115,13 @@
 
       <div class="card done" id="done" hidden>
         <h3>Pré-reserva enviada!</h3>
-        <p>Código <strong id="done-code"></strong>. Os horários ficam reservados para você até a clínica confirmar.</p>
-        <p>Para agilizar, avise a clínica pelo WhatsApp:</p>
-        <a class="btn" id="done-wa" href="#" target="_blank" rel="noopener">Avisar no WhatsApp</a>
-        <a class="btn ghost" href="index.html">Voltar ao início</a>
+        <p>Código <strong id="done-code"></strong>. Os horários ficam separados para você enquanto aguardam o pagamento.</p>
+        <div class="paybox" id="done-pay"></div>
+        <p class="muted small" id="done-note"></p>
+        <div class="row-actions">
+          <a class="btn" id="done-wa" href="#" target="_blank" rel="noopener">Falar com a clínica no WhatsApp</a>
+          <a class="btn ghost" id="done-acc" href="conta.html">Acompanhar minha reserva</a>
+        </div>
       </div>
     </div>
   </section>

@@ -1,7 +1,7 @@
 (async function () {
   const M = window.Morada, sb = M.client, BUCKET = M.cfg.BUCKET || "fotos";
   const $ = s => document.querySelector(s);
-  const show = id => ["#v-config", "#v-login", "#v-reset", "#v-app"].forEach(v => $(v).hidden = v !== id);
+  const show = id => ["#v-config", "#v-login", "#v-reset", "#v-app", "#v-noaccess"].forEach(v => $(v).hidden = v !== id);
 
   let toastTimer;
   function toast(msg, isError) {
@@ -45,15 +45,18 @@
     history.replaceState(null, "", location.pathname); toast("Senha alterada."); start();
   });
   $("#logout").addEventListener("click", () => sb.auth.signOut());
+  $("#noaccess-out").addEventListener("click", () => sb.auth.signOut());
 
   // ---------- abas ----------
-  const tabs = [["#t-reservas", "#p-reservas"], ["#t-salas", "#p-salas"], ["#t-textos", "#p-textos"]];
+  const tabs = [["#t-reservas", "#p-reservas"], ["#t-salas", "#p-salas"], ["#t-textos", "#p-textos"], ["#t-equipe", "#p-equipe"]];
   tabs.forEach(([t, p]) => $(t).addEventListener("click", () => tabs.forEach(([t2, p2]) => {
     $(t2).setAttribute("aria-selected", t2 === t ? "true" : "false"); $(p2).hidden = p2 !== p;
   })));
 
   async function start() {
     started = true;
+    const { data: staff, error: se } = await sb.rpc("is_staff");
+    if (se || !staff) { show("#v-noaccess"); return; }
     show("#v-app"); $("#top-actions").hidden = false;
     await Promise.all([renderRooms(), renderTextos()]);
     window.dispatchEvent(new CustomEvent("morada:start"));

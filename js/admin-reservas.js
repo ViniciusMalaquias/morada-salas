@@ -20,7 +20,7 @@
     $("#b-data").value = M.iso(new Date());
     if (!bound) bind();
     bound = true;
-    await Promise.all([renderList(), renderAgenda(), updateCount()]);
+    await Promise.all([renderList(), renderAgenda(), updateCount(), renderStaff()]);
   }
 
   function bind() {
@@ -36,11 +36,14 @@
     $("#ag-prev").onclick = () => { agWeek = M.addDays(agWeek, -7); renderAgenda(); };
     $("#ag-next").onclick = () => { agWeek = M.addDays(agWeek, 7); renderAgenda(); };
     $("#res-list").addEventListener("click", onAction);
+    $("#f-staff").addEventListener("submit", addStaff);
+    $("#staff-list").addEventListener("click", removeStaff);
   }
 
   // ---------- helpers ----------
   const waNumber = t => { let d = String(t || "").replace(/\D/g, ""); if (d.length === 10 || d.length === 11) d = "55" + d; return d; };
-  const code = id => String(id).slice(0, 8).toUpperCase();
+  const code = r => r.codigo || String(r.id).slice(0, 8).toUpperCase();
+  const FORMAS = ["Pix", "Link de pagamento", "Cartão na clínica", "Dinheiro", "Outro"];
   const fmtDate = s => { const d = M.parse(s); return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}`; };
   function fmtSlot(s) {
     const d = M.parse(s.data);
@@ -73,12 +76,15 @@
     const slots = (r.reservation_slots || []).sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini);
     const isBloq = r.plano === "bloqueio";
     const when = new Date(r.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const st = M.statusOf(r, C);
+    if (st === "expirada") el.classList.add("st-expirada");
     const resumo = (r.resumo || "").split("\n").filter(l => !/^Plano:/.test(l));
     el.innerHTML = `
       <div class="res-head">
-        <span class="pill st">${STATUS[r.status]}</span>
-        <strong>${esc(isBloq ? r.nome : r.nome)}</strong>
-        <span class="muted small">${esc(r.rooms?.name || "")} · ${PLANO[r.plano]} · ${isBloq ? "" : `código ${code(r.id)} · `}${when}</span>
+        <span class="pill st">${st === "expirada" ? "Prazo vencido" : st === "pendente" ? "Aguardando pagamento" : STATUS[r.status]}</span>
+        <strong>${esc(r.nome)}</strong>
+        ${isBloq ? "" : `<span class="tag">${r.user_id ? "Com conta" : "Visitante"}</span>`}
+        <span class="muted small">${esc(r.rooms?.name || "")} · ${PLANO[r.plano]} · ${isBloq ? "" : `código ${esc(code(r))} · `}${when}</span>
       </div>
       <div class="res-body">
         ${isBloq ? "" : `<dl class="res-dl">
@@ -88,7 +94,10 @@
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>`}
         <div class="res-when"><b>Horários</b><ul>${(slots.length ? slots.map(fmtSlot) : ["Nenhum marcado ainda (pacote)"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
-          ${!isBloq && resumo.length ? `<p class="muted small">${esc(resumo[resumo.length - 1])}</p>` : ""}</div>
+          ${!isBloq && resumo.length ? `<p class="muted small">${esc(resumo[resumo.length - 1])}</p>` : ""}
+          ${st === "pendente" ? `<p class="muted small">Prazo para pagar: ${M.fmtDateTime(M.expiresAt(r, C))}</p>` : ""}
+          ${st === "expirada" ? `<p class="small warn">O prazo passou e o horário voltou a aparecer livre no site. Dá para confirmar se ninguém tiver pegado o horário.</p>` : ""}
+          ${r.status === "confirmada" && !isBloq && r.pago_em ? `<p class="muted small">Pago em ${M.fmtDateTime(new Date(r.pago_em))}${r.pagamento_forma ? ` · ${esc(r.pagamento_forma)}` : ""}${r.pagamento_valor != null ? ` · ${M.money(r.pagamento_valor)}` : ""}${r.pagamento_obs ? ` · ${esc(r.pagamento_obs)}` : ""}</p>` : ""}</div>
       </div>
       <div class="res-actions">${actions(r)}</div>`;
     el._r = r;
@@ -97,7 +106,7 @@
 
   function actions(r) {
     if (r.plano === "bloqueio") return `<button type="button" class="btn ghost small" data-a="ask-cancel">Remover bloqueio</button>`;
-    if (r.status === "pendente") return `<button type="button" class="btn small" data-a="confirm">Confirmar</button><button type="button" class="btn ghost small" data-a="ask-refuse">Recusar</button>`;
+    if (r.status === "pendente") return `<button type="button" class="btn small" data-a="ask-confirm">Pagamento recebido</button><a class="btn ghost small" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Enviar cobrança</a><button type="button" class="btn ghost small" data-a="ask-refuse">Recusar</button>`;
     if (r.status === "confirmada") return `<a class="btn ghost small" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Mensagem no WhatsApp</a><button type="button" class="linkbtn danger-text" data-a="ask-cancel">Cancelar reserva</button>`;
     return "";
   }
@@ -105,15 +114,17 @@
   function waLink(r, kind) {
     const first = (r.nome || "").split(" ")[0];
     const msg = kind === "confirmada"
-      ? `Olá, ${first}! Sua reserva na Clínica Morada do Ser (código ${code(r.id)}) está confirmada.\n${(r.resumo || "").trim()}\nQualquer dúvida, é só chamar por aqui.`
+      ? `Olá, ${first}! Recebemos seu pagamento e sua reserva na Clínica Morada do Ser (código ${code(r)}) está confirmada.\n${(r.resumo || "").trim()}\nQualquer dúvida, é só chamar por aqui.`
+      : kind === "cobranca"
+      ? `Olá, ${first}! Recebemos sua pré-reserva na Clínica Morada do Ser (código ${code(r)}).\n${(r.resumo || "").trim()}\n${C.pix_chave ? `Para garantir o horário, pague por Pix até ${M.fmtDateTime(M.expiresAt(r, C))}:\nChave: ${C.pix_chave}\nRecebedor: ${C.pix_nome || ""}\n` : `Para garantir o horário, o pagamento precisa ser feito até ${M.fmtDateTime(M.expiresAt(r, C))}. `}Depois é só mandar o comprovante por aqui.`
       : kind === "recusada"
-      ? `Olá, ${first}! Infelizmente não conseguimos confirmar sua pré-reserva (código ${code(r.id)}) na Clínica Morada do Ser. Podemos ver outro horário para você?`
-      : `Olá, ${first}! Sua reserva (código ${code(r.id)}) na Clínica Morada do Ser foi cancelada.`;
+      ? `Olá, ${first}! Infelizmente não conseguimos confirmar sua pré-reserva (código ${code(r)}) na Clínica Morada do Ser. Podemos ver outro horário para você?`
+      : `Olá, ${first}! Sua reserva (código ${code(r)}) na Clínica Morada do Ser foi cancelada.`;
     return `https://wa.me/${waNumber(r.telefone)}?text=${encodeURIComponent(msg)}`;
   }
 
   async function setStatus(r, status) {
-    const { error } = await sb.from("reservations").update({ status, decided_at: new Date().toISOString() }).eq("id", r.id);
+    const { error } = await sb.from("reservations").update({ status, decided_at: new Date().toISOString(), ...(status === "cancelada" ? { cancelado_por: "clinica" } : {}) }).eq("id", r.id);
     if (error) { window.MoradaAdmin.fail("Erro ao atualizar reserva", error); return false; }
     r.status = status; updateCount(); renderAgenda(); return true;
   }
@@ -123,10 +134,29 @@
     const el = b.closest(".res"), r = el._r, box = el.querySelector(".res-actions"), a = b.dataset.a;
     const ask = (txt, yes, label) => { box.innerHTML = `<span class="small">${txt}</span><button type="button" class="btn danger small" data-a="${yes}">${label}</button><button type="button" class="btn ghost small" data-a="back">Voltar</button>`; };
     if (a === "back") box.innerHTML = actions(r);
+    if (a === "ask-confirm") {
+      box.innerHTML = `<div class="payform">
+        <div class="field"><label>Forma de pagamento</label><select data-pf="forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
+        <div class="field"><label>Valor recebido (R$)</label><input data-pf="valor" type="number" step="0.01" min="0" value="${r.total ?? ""}"></div>
+        <div class="field"><label>Observação</label><input data-pf="obs" type="text" placeholder="Ex.: referente a novembro"></div>
+        <div class="row-actions"><button type="button" class="btn small" data-a="confirm">Confirmar reserva</button><button type="button" class="btn ghost small" data-a="back">Voltar</button></div></div>`;
+      return;
+    }
+    if (a === "confirm") {
+      b.disabled = true;
+      const v = k => box.querySelector(`[data-pf="${k}"]`).value;
+      const { error } = await sb.rpc("confirm_reservation", { p_id: r.id, p_forma: v("forma"), p_valor: v("valor") === "" ? null : Number(v("valor")), p_obs: v("obs") });
+      if (error) { b.disabled = false; return window.MoradaAdmin.toast(error.message, true); }
+      r.status = "confirmada"; updateCount(); renderAgenda();
+      el.className = "res st-confirmada"; el.querySelector(".pill.st").textContent = STATUS.confirmada;
+      box.innerHTML = `<span class="small">Confirmada. Avise a pessoa:</span><a class="btn small" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Enviar no WhatsApp</a>`;
+      window.MoradaAdmin.toast("Reserva confirmada.");
+      return;
+    }
     if (a === "ask-refuse") ask("Recusar esta pré-reserva? Os horários voltam a ficar livres.", "refuse", "Recusar");
     if (a === "ask-cancel") ask(r.plano === "bloqueio" ? "Remover este bloqueio?" : "Cancelar esta reserva? Os horários voltam a ficar livres.", "cancel", r.plano === "bloqueio" ? "Remover" : "Cancelar reserva");
-    if (a === "confirm" || a === "refuse" || a === "cancel") {
-      const status = a === "confirm" ? "confirmada" : a === "refuse" ? "recusada" : "cancelada";
+    if (a === "refuse" || a === "cancel") {
+      const status = a === "refuse" ? "recusada" : "cancelada";
       b.disabled = true;
       if (!(await setStatus(r, status))) { b.disabled = false; return; }
       el.className = `res st-${status}`; el.querySelector(".pill.st").textContent = STATUS[status];
@@ -153,6 +183,28 @@
     toast("Horário bloqueado.");
     $("#ag-sala").value = room; agWeek = M.monday(M.parse(data));
     renderAgenda(); if (filter === "bloqueio") renderList();
+  }
+
+  // ---------- equipe ----------
+  async function renderStaff() {
+    const { data, error } = await sb.from("staff").select("user_id,email,created_at").order("created_at");
+    if (error) return window.MoradaAdmin.fail("Erro ao carregar equipe", error);
+    const me = (await M.getUser())?.id;
+    $("#staff-list").innerHTML = data.map(s => `<li><span>${esc(s.email)}${s.user_id === me ? ' <span class="muted small">(você)</span>' : ""}</span>
+      ${s.user_id === me ? "" : `<button type="button" class="linkbtn danger-text" data-rm="${s.user_id}">Remover acesso</button>`}</li>`).join("");
+  }
+  async function addStaff(e) {
+    e.preventDefault();
+    const { error } = await sb.rpc("add_staff", { p_email: $("#st-email").value });
+    if (error) return window.MoradaAdmin.toast(error.message, true);
+    $("#st-email").value = ""; window.MoradaAdmin.toast("Acesso liberado."); renderStaff();
+  }
+  async function removeStaff(e) {
+    const b = e.target.closest("[data-rm]"); if (!b) return;
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Clique de novo para remover"; return; }
+    const { error } = await sb.rpc("remove_staff", { p_user: b.dataset.rm });
+    if (error) return window.MoradaAdmin.toast(error.message, true);
+    window.MoradaAdmin.toast("Acesso removido."); renderStaff();
   }
 
   // ---------- agenda ----------
