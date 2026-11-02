@@ -11,32 +11,22 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/painel.css">
 </head>
 <body class="admin">
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="index.html" aria-label="Ver o site">
-      <span class="logo" aria-hidden="true"></span>
-      <span><b>Painel</b><em>Salas Morada do Ser</em></span>
-    </a>
-    <nav id="top-actions" hidden>
-      <a href="index.html" target="_blank" rel="noopener">Ver site</a>
-      <button class="btn ghost small" id="logout" type="button">Sair</button>
-    </nav>
-  </div>
-</header>
 
-<main class="wrap">
-  <!-- não configurado -->
-  <section class="panel" id="v-config" hidden>
+<!-- telas de acesso -->
+<div class="auth-shell" id="auth-shell">
+  <a class="brand auth-brand" href="index.html"><span class="logo" aria-hidden="true"></span><span><b>Painel</b><em>Salas Morada do Ser</em></span></a>
+
+  <section class="panel narrow" id="v-config" hidden>
     <h2>Falta conectar o Supabase</h2>
-    <p>Preencha <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> no arquivo <code>js/config.js</code>. O passo a passo está no README.</p>
+    <p>Preencha <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> no arquivo <code>js/config.js</code>.</p>
   </section>
 
-  <!-- login -->
   <section class="panel narrow" id="v-login" hidden>
-    <h2>Entrar</h2>
-    <p class="muted">Acesso da equipe da clínica para editar salas, fotos e textos.</p>
+    <h2>Entrar no painel</h2>
+    <p class="muted">Acesso da equipe da clínica.</p>
     <form id="f-login" class="stack" novalidate>
       <div class="field"><label for="l-email">E-mail</label><input id="l-email" type="email" autocomplete="username" required></div>
       <div class="field"><label for="l-pass">Senha</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
@@ -46,7 +36,6 @@
     </form>
   </section>
 
-  <!-- nova senha (link de recuperação) -->
   <section class="panel narrow" id="v-reset" hidden>
     <h2>Criar nova senha</h2>
     <form id="f-reset" class="stack" novalidate>
@@ -56,90 +45,157 @@
     </form>
   </section>
 
-  <!-- painel -->
-  <!-- conta sem acesso -->
   <section class="panel narrow" id="v-noaccess" hidden>
     <h2>Esta conta não tem acesso ao painel</h2>
-    <p class="muted">O painel é só para a equipe da clínica. Se você trabalha na clínica, peça para alguém da equipe liberar seu e-mail na aba Equipe.</p>
+    <p class="muted">O painel é só para a equipe da clínica. Se você trabalha na clínica, peça para alguém da equipe liberar seu e-mail em Equipe.</p>
     <div class="row-actions"><a class="btn" href="conta.html">Ir para Minha conta</a><button class="btn ghost" type="button" id="noaccess-out">Sair</button></div>
   </section>
+</div>
 
-  <section id="v-app" hidden>
-    <div class="tabs" role="tablist">
-      <button role="tab" id="t-reservas" aria-selected="true" aria-controls="p-reservas">Reservas <span class="count" id="pend-count" hidden></span></button>
-      <button role="tab" id="t-salas" aria-selected="false" aria-controls="p-salas">Salas</button>
-      <button role="tab" id="t-textos" aria-selected="false" aria-controls="p-textos">Textos, preços e horários</button>
-      <button role="tab" id="t-equipe" aria-selected="false" aria-controls="p-equipe">Equipe</button>
+<!-- painel -->
+<div class="app" id="v-app" hidden>
+  <aside class="side" id="side">
+    <a class="brand side-brand" href="index.html" target="_blank" rel="noopener" aria-label="Ver o site"><span class="logo" aria-hidden="true"></span><span><b>Painel</b><em>Morada do Ser</em></span></a>
+    <nav class="nav" aria-label="Painel">
+        <button type="button" class="nav-i" data-page="inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Início</span></button>
+        <button type="button" class="nav-i" data-page="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span>Agenda</span></button>
+        <button type="button" class="nav-i" data-page="reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11"/><circle cx="4.5" cy="5" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="19" r="1.5"/></svg><span>Reservas</span><b class="badge" id="pend-count" hidden></b></button>
+        <button type="button" class="nav-i" data-page="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 20c0-3-2-4.5-4-5"/></svg><span>Clientes</span></button>
+        <button type="button" class="nav-i" data-page="financeiro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10v.01M18 15v.01"/></svg><span>Financeiro</span></button>
+        <button type="button" class="nav-i" data-page="salas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16M2 21h20M15 12v.01"/></svg><span>Salas</span></button>
+        <button type="button" class="nav-i" data-page="conteudo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg><span>Conteúdo e preços</span></button>
+        <button type="button" class="nav-i" data-page="equipe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><span>Equipe</span></button>
+    </nav>
+    <div class="side-foot">
+      <span class="me" id="me-email"></span>
+      <div class="side-links"><a href="index.html" target="_blank" rel="noopener">Ver site ↗</a><button type="button" class="linkbtn" id="logout">Sair</button></div>
+      <span id="top-actions" hidden></span>
     </div>
+  </aside>
+  <div class="side-bg" id="side-bg" hidden></div>
 
-    <div id="p-reservas" role="tabpanel" aria-labelledby="t-reservas">
-      <div class="bar">
-        <div class="chips-f" role="group" aria-label="Filtrar reservas">
-          <button type="button" data-f="pendente" aria-pressed="true">Pendentes</button>
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="icon menu-btn" id="menu-btn" aria-label="Abrir menu">☰</button>
+      <div class="tb-title"><span class="eyebrow" id="page-eyebrow"></span><h1 id="page-title">Início</h1></div>
+      <div class="tb-actions" id="tb-actions"></div>
+    </header>
+
+    <!-- INÍCIO -->
+    <section class="page" data-page="inicio">
+      <div class="kpis" id="kpis"></div>
+      <div class="grid-2">
+        <div class="card-p"><div class="card-h"><h2>Hoje</h2><span class="muted small" id="today-label"></span></div><div id="today-list" class="timeline"></div></div>
+        <div class="card-p"><div class="card-h"><h2>Precisa de atenção</h2></div><div id="attention" class="att-list"></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card-p"><div class="card-h"><h2>Ocupação desta semana</h2></div><div id="occ-bars" class="bars"></div></div>
+        <div class="card-p"><div class="card-h"><h2>Recebido nos últimos meses</h2></div><div id="rev-chart" class="rev"></div></div>
+      </div>
+    </section>
+
+    <!-- AGENDA -->
+    <section class="page" data-page="agenda" hidden>
+      <div class="toolbar">
+        <div class="seg-a" role="group" aria-label="Visualização">
+          <button type="button" data-view="dia" aria-pressed="true">Dia</button>
+          <button type="button" data-view="semana" aria-pressed="false">Semana</button>
+        </div>
+        <div class="datenav">
+          <button type="button" class="icon" id="ag-prev" aria-label="Anterior">←</button>
+          <button type="button" class="btn ghost small" id="ag-today">Hoje</button>
+          <button type="button" class="icon" id="ag-next" aria-label="Próximo">→</button>
+          <strong id="ag-label"></strong>
+        </div>
+        <select id="ag-sala" aria-label="Sala" hidden></select>
+        <div class="legend"><span><i class="lg conf"></i>Confirmada</span><span><i class="lg pend"></i>Aguardando pagamento</span><span><i class="lg blk"></i>Bloqueio</span></div>
+      </div>
+      <p class="muted small">Clique num horário vazio para criar uma reserva ou bloquear. Clique numa reserva para ver os detalhes.</p>
+      <div class="cal-wrap"><div class="cal-grid" id="cal-grid"></div></div>
+    </section>
+
+    <!-- RESERVAS -->
+    <section class="page" data-page="reservas" hidden>
+      <div class="toolbar">
+        <input type="search" id="rs-q" class="search" placeholder="Buscar por nome, CPF, telefone ou código" aria-label="Buscar reservas">
+        <div class="chips-f" role="group" aria-label="Filtrar">
+          <button type="button" data-f="pendente" aria-pressed="true">Aguardando pagamento</button>
           <button type="button" data-f="confirmada" aria-pressed="false">Confirmadas</button>
-          <button type="button" data-f="encerradas" aria-pressed="false">Recusadas e canceladas</button>
+          <button type="button" data-f="encerradas" aria-pressed="false">Encerradas</button>
           <button type="button" data-f="bloqueio" aria-pressed="false">Bloqueios</button>
+          <button type="button" data-f="todas" aria-pressed="false">Todas</button>
         </div>
-        <button class="btn ghost small" id="btn-bloq" type="button">+ Bloquear horário</button>
       </div>
+      <div class="table-wrap"><table class="tbl" id="rs-table"></table></div>
+    </section>
 
-      <form class="group bloq" id="f-bloq" hidden novalidate>
-        <h3>Bloquear horário</h3>
-        <p class="muted small">Use para horários em que a própria clínica vai usar a sala. O horário some do site.</p>
-        <div class="bloq-grid">
-          <div class="field"><label for="b-sala">Sala</label><select id="b-sala"></select></div>
-          <div class="field"><label for="b-data">Data</label><input id="b-data" type="date" required></div>
-          <div class="field"><label for="b-ini">Das</label><select id="b-ini"></select></div>
-          <div class="field"><label for="b-fim">Até</label><select id="b-fim"></select></div>
-          <div class="field"><label for="b-freq">Repetir</label><select id="b-freq"><option value="unica">Não repetir</option><option value="semanal">Toda semana</option><option value="quinzenal">A cada 15 dias</option></select></div>
-          <div class="field"><label for="b-motivo">Motivo</label><input id="b-motivo" type="text" placeholder="Ex.: atendimento da clínica"></div>
+    <!-- CLIENTES -->
+    <section class="page" data-page="clientes" hidden>
+      <div class="toolbar"><input type="search" id="cl-q" class="search" placeholder="Buscar cliente" aria-label="Buscar clientes"></div>
+      <div class="table-wrap"><table class="tbl" id="cl-table"></table></div>
+    </section>
+
+    <!-- FINANCEIRO -->
+    <section class="page" data-page="financeiro" hidden>
+      <div class="toolbar">
+        <div class="datenav">
+          <button type="button" class="icon" id="fi-prev" aria-label="Mês anterior">←</button>
+          <strong id="fi-label"></strong>
+          <button type="button" class="icon" id="fi-next" aria-label="Próximo mês">→</button>
         </div>
-        <div class="row-actions"><button class="btn" type="submit">Salvar bloqueio</button><button class="btn ghost" type="button" id="b-cancel">Cancelar</button></div>
-      </form>
-
-      <div id="res-list" class="res-list"></div>
-
-      <div class="group agenda">
-        <div class="agenda-head">
-          <h3>Agenda da semana</h3>
-          <div class="agenda-ctrl">
-            <select id="ag-sala" aria-label="Sala"></select>
-            <button type="button" class="icon" id="ag-prev" aria-label="Semana anterior">←</button>
-            <strong id="ag-label"></strong>
-            <button type="button" class="icon" id="ag-next" aria-label="Próxima semana">→</button>
-          </div>
-        </div>
-        <div class="cal-scroll"><table class="agcal" id="agcal"></table></div>
-        <div class="legend"><span><i class="lg conf"></i>Confirmada</span><span><i class="lg pend"></i>Pendente</span><span><i class="lg blk"></i>Bloqueio</span></div>
+        <button type="button" class="btn ghost small" id="fi-csv">Baixar planilha do mês</button>
       </div>
-    </div>
+      <div class="kpis" id="fi-kpis"></div>
+      <div class="card-p"><div class="card-h"><h2>Mensalidades dos planos fixos</h2><span class="muted small">Vencimento até o dia 5</span></div><div class="table-wrap"><table class="tbl" id="fi-mens"></table></div></div>
+      <div class="card-p"><div class="card-h"><h2>Pagamentos recebidos</h2></div><div class="table-wrap"><table class="tbl" id="fi-pays"></table></div></div>
+    </section>
 
-    <div id="p-salas" role="tabpanel" aria-labelledby="t-salas" hidden>
+    <!-- SALAS -->
+    <section class="page" data-page="salas" hidden>
       <div class="bar">
         <p class="muted">Use as setas para mudar a ordem das salas. Salas ocultas não aparecem no site.</p>
         <button class="btn" id="add-room" type="button">+ Adicionar sala</button>
       </div>
       <div id="room-list" class="room-list"></div>
-    </div>
+    </section>
 
-    <div id="p-equipe" role="tabpanel" aria-labelledby="t-equipe" hidden>
-      <div class="group narrow-g">
-        <h3>Quem acessa o painel</h3>
-        <p class="muted small">Para dar acesso a alguém, a pessoa primeiro cria uma conta em "Entrar" no site. Depois é só adicionar o e-mail dela aqui.</p>
+    <!-- CONTEÚDO -->
+    <section class="page" data-page="conteudo" hidden>
+      <form id="f-textos" class="stack" novalidate></form>
+      <div class="savebar"><span class="muted" id="textos-status">Sem alterações.</span><button class="btn" form="f-textos" type="submit">Salvar alterações</button></div>
+    </section>
+
+    <!-- EQUIPE -->
+    <section class="page" data-page="equipe" hidden>
+      <div class="card-p narrow-g">
+        <div class="card-h"><h2>Quem acessa o painel</h2></div>
+        <p class="muted small">Para dar acesso, a pessoa primeiro cria uma conta em "Entrar" no site. Depois é só adicionar o e-mail dela aqui.</p>
         <ul class="staff-list" id="staff-list"></ul>
         <form class="staff-add" id="f-staff" novalidate>
           <div class="field"><label for="st-email">E-mail da pessoa</label><input id="st-email" type="email" required></div>
           <button class="btn" type="submit">Dar acesso</button>
         </form>
       </div>
-    </div>
+    </section>
+  </div>
 
-    <div id="p-textos" role="tabpanel" aria-labelledby="t-textos" hidden>
-      <form id="f-textos" class="stack" novalidate></form>
-      <div class="savebar"><span class="muted" id="textos-status">Sem alterações.</span><button class="btn" form="f-textos" type="submit">Salvar textos</button></div>
-    </div>
-  </section>
-</main>
+  <nav class="mnav" aria-label="Atalhos">
+    <button type="button" class="mnav-i" data-page="inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Início</span></button>
+    <button type="button" class="mnav-i" data-page="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span>Agenda</span></button>
+    <button type="button" class="mnav-i" data-page="reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11"/><circle cx="4.5" cy="5" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="19" r="1.5"/></svg><span>Reservas</span></button>
+    <button type="button" class="mnav-i" data-page="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 20c0-3-2-4.5-4-5"/></svg><span>Clientes</span></button>
+    <button type="button" class="mnav-i" id="mnav-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Mais</span></button>
+  </nav>
+</div>
+
+<!-- painel lateral de detalhes -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-bg" data-close></div>
+  <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="dr-title">
+    <header class="dr-head"><h2 id="dr-title"></h2><button type="button" class="icon" data-close aria-label="Fechar">✕</button></header>
+    <div class="dr-body" id="dr-body"></div>
+  </aside>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -180,6 +236,6 @@
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
 <script src="js/admin.js"></script>
-<script src="js/admin-reservas.js"></script>
+<script src="js/painel.js"></script>
 </body>
 </html>

@@ -319,12 +319,15 @@
     $("#done-code").textContent = code;
     $("#done-pay").innerHTML = `
       <p><b>Pague até ${ate}</b> para garantir o horário. Valor: <b>${M.money(r.total)}</b>${mode() === "fixo" ? " por mês (estimativa)" : ""}.</p>
-      ${C.pix_chave ? `<p>Pix (${esc(C.pix_nome || "")}): <code>${esc(C.pix_chave)}</code></p>` : ""}
+      ${C.pix_chave ? (() => { const pl = M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code });
+        return `<div class="pix-done"><div class="qr" data-qr="${esc(pl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pl)}">Copiar</button></div></div></div>`; })() : ""}
       <p class="muted small">${esc(C.pagamento_texto || "")}</p>`;
     $("#done-note").textContent = pendingConfirm
       ? `Sua conta foi criada. Confirme o e-mail que enviamos para ${email}; depois de entrar, esta reserva aparece em Minha conta.`
       : user ? "Você acompanha esta reserva em Minha conta." : "Guarde o código: com ele e seu WhatsApp você acompanha a reserva em Minha conta.";
     $("#done-wa").href = wa(`Olá! Fiz uma pré-reserva pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nNome: ${nome}`);
+    if (window.qrcode) document.querySelectorAll("[data-qr]").forEach(el => { const q = qrcode(0, "M"); q.addData(el.dataset.qr); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); });
+    document.querySelectorAll("#done [data-copy]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copiado"; } catch { b.previousElementSibling.select(); } });
     document.querySelector(".booking").hidden = true;
     $("#done").hidden = false;
     $("#done").scrollIntoView({ behavior: "smooth", block: "center" });

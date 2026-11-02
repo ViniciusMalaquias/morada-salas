@@ -1,7 +1,10 @@
 (async function () {
   const M = window.Morada, sb = M.client, BUCKET = M.cfg.BUCKET || "fotos";
   const $ = s => document.querySelector(s);
-  const show = id => ["#v-config", "#v-login", "#v-reset", "#v-app", "#v-noaccess"].forEach(v => $(v).hidden = v !== id);
+  const show = id => {
+    ["#v-config", "#v-login", "#v-reset", "#v-app", "#v-noaccess"].forEach(v => $(v).hidden = v !== id);
+    $("#auth-shell").hidden = id === "#v-app";
+  };
 
   let toastTimer;
   function toast(msg, isError) {
@@ -18,7 +21,7 @@
   sb.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") { show("#v-reset"); return; }
     if (session && !started && !location.hash.includes("type=recovery")) start();
-    if (!session) { started = false; $("#top-actions").hidden = true; show("#v-login"); }
+    if (!session) { started = false; show("#v-login"); }
   });
   const { data: { session } } = await sb.auth.getSession();
   if (!session && !location.hash.includes("type=recovery")) show("#v-login");
@@ -42,22 +45,37 @@
     if (p.length < 8) { err.textContent = "A senha precisa ter pelo menos 8 caracteres."; err.hidden = false; return; }
     const { error } = await sb.auth.updateUser({ password: p });
     if (error) { err.textContent = error.message; err.hidden = false; return; }
-    history.replaceState(null, "", location.pathname); toast("Senha alterada."); start();
+    history.replaceState(null, "", location.pathname); toast("Senha alterada."); if (!started) start();
   });
   $("#logout").addEventListener("click", () => sb.auth.signOut());
   $("#noaccess-out").addEventListener("click", () => sb.auth.signOut());
 
-  // ---------- abas ----------
-  const tabs = [["#t-reservas", "#p-reservas"], ["#t-salas", "#p-salas"], ["#t-textos", "#p-textos"], ["#t-equipe", "#p-equipe"]];
-  tabs.forEach(([t, p]) => $(t).addEventListener("click", () => tabs.forEach(([t2, p2]) => {
-    $(t2).setAttribute("aria-selected", t2 === t ? "true" : "false"); $(p2).hidden = p2 !== p;
-  })));
+  // ---------- navegação ----------
+  const TITLES = { inicio: "Início", agenda: "Agenda", reservas: "Reservas", clientes: "Clientes", financeiro: "Financeiro", salas: "Salas", conteudo: "Conteúdo e preços", equipe: "Equipe" };
+  function go(page) {
+    if (!TITLES[page]) page = "inicio";
+    document.querySelectorAll(".page").forEach(p => p.hidden = p.dataset.page !== page);
+    document.querySelectorAll("[data-page].nav-i, [data-page].mnav-i").forEach(b => b.setAttribute("aria-current", b.dataset.page === page ? "page" : "false"));
+    $("#page-title").textContent = TITLES[page];
+    $("#side").classList.remove("open"); $("#side-bg").hidden = true;
+    if (location.hash !== "#" + page) history.replaceState(null, "", "#" + page);
+    window.dispatchEvent(new CustomEvent("morada:page", { detail: page }));
+    window.scrollTo(0, 0);
+  }
+  window.MoradaAdmin.go = go;
+  document.querySelectorAll("button[data-page]").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
+  const openSide = () => { $("#side").classList.add("open"); $("#side-bg").hidden = false; };
+  $("#menu-btn").addEventListener("click", openSide);
+  $("#mnav-more").addEventListener("click", openSide);
+  $("#side-bg").addEventListener("click", () => { $("#side").classList.remove("open"); $("#side-bg").hidden = true; });
 
   async function start() {
     started = true;
     const { data: staff, error: se } = await sb.rpc("is_staff");
     if (se || !staff) { show("#v-noaccess"); return; }
-    show("#v-app"); $("#top-actions").hidden = false;
+    show("#v-app");
+    const u = await M.getUser(); $("#me-email").textContent = u?.email || "";
+    go(location.hash.replace("#", "") || "inicio");
     await Promise.all([renderRooms(), renderTextos()]);
     window.dispatchEvent(new CustomEvent("morada:start"));
   }

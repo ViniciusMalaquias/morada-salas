@@ -99,8 +99,12 @@
       </div>
     </div>
 
+    <div id="hero-next"></div>
+    <div id="pend-box" class="pend-box"></div>
+
     <div class="tabs-c" role="tablist">
       <button role="tab" data-p="p-res" aria-selected="true">Minhas reservas</button>
+      <button role="tab" data-p="p-pag" aria-selected="false">Pagamentos e recibos</button>
       <button role="tab" data-p="p-dados" aria-selected="false">Meus dados</button>
     </div>
 
@@ -118,6 +122,8 @@
       </details>
     </div>
 
+    <div id="p-pag" hidden><div id="pay-list" class="card pay-list"></div></div>
+
     <div id="p-dados" hidden>
       <form id="f-perfil" class="card stack narrow" novalidate>
         <div class="field"><label for="p-nome">Nome completo</label><input id="p-nome" type="text" autocomplete="name"></div>
@@ -133,6 +139,14 @@
   </section>
 </main>
 
+<div class="modal" id="recibo" hidden>
+  <div class="modal-bg" data-close-rec></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="Recibo">
+    <div id="recibo-body"></div>
+    <div class="row-actions no-print"><button type="button" class="btn" id="rec-print">Imprimir ou salvar em PDF</button><button type="button" class="btn ghost" data-close-rec>Fechar</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <footer>
@@ -144,6 +158,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="js/config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="js/content.js"></script>
 <script src="js/conta.js"></script>
 </body>

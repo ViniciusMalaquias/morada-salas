@@ -52,6 +52,7 @@
     prazo_pagamento_horas: 24,
     pix_chave: "",
     pix_nome: "Clínica Morada do Ser",
+    pix_cidade: "Jundiaí",
     pagamento_texto: "Pague por Pix ou peça um link de pagamento pelo WhatsApp. Depois de pagar, envie o comprovante pelo WhatsApp com o código da reserva.",
     whatsapp: "5511953063868",
     telefone: "(11) 95306-3868",
@@ -90,8 +91,9 @@
     ]},
     { group: "Pagamento", fields: [
       { key: "prazo_pagamento_horas", label: "Prazo para pagar a pré-reserva (horas)", type: "number", min: 1, max: 168, hint: "Depois desse prazo sem pagamento, o horário volta a aparecer livre no site." },
-      { key: "pix_chave", label: "Chave Pix", type: "text", hint: "Aparece para o cliente na área dele e na mensagem de pagamento." },
+      { key: "pix_chave", label: "Chave Pix", type: "text", hint: "Gera o QR Code com o valor já preenchido. Celular no formato +5511999999999; CPF/CNPJ só números; ou e-mail ou chave aleatória." },
       { key: "pix_nome", label: "Nome do recebedor do Pix", type: "text" },
+      { key: "pix_cidade", label: "Cidade do recebedor", type: "text" },
       { key: "pagamento_texto", label: "Instruções de pagamento", type: "textarea" }
     ]},
     { group: "Horário de funcionamento", fields: [
@@ -215,6 +217,27 @@
   // máscara automática em qualquer input[data-cpf]
   document.addEventListener("input", e => { if (e.target.matches?.("input[data-cpf]")) e.target.value = cpfFormat(e.target.value); });
 
+  // ---------- Pix (BR Code estático com valor) ----------
+  function crc16(str) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+    return crc.toString(16).toUpperCase().padStart(4, "0");
+  }
+  function pixPayload({ chave, nome, cidade, valor, txid }) {
+    const norm = v => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9 ]/g, "").toUpperCase().trim();
+    const f = (id, v) => id + String(v.length).padStart(2, "0") + v;
+    let k = String(chave || "").trim();
+    if (/^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$/.test(k)) k = "+55" + onlyDigits(k);
+    const p = f("00", "01") + f("26", f("00", "br.gov.bcb.pix") + f("01", k)) + f("52", "0000") + f("53", "986")
+      + (valor > 0 ? f("54", Number(valor).toFixed(2)) : "") + f("58", "BR")
+      + f("59", norm(nome).slice(0, 25) || "RECEBEDOR") + f("60", norm(cidade).slice(0, 15) || "JUNDIAI")
+      + f("62", f("05", String(txid || "***").replace(/[^A-Za-z0-9]/g, "").slice(0, 25) || "***")) + "6304";
+    return p + crc16(p);
+  }
+
   // ---------- contas ----------
   async function getUser() {
     if (!client) return null;
@@ -249,7 +272,7 @@
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
     money, pct, plans, semanalRate, ranges, iso, parse, addDays, monday, br, pad,
-    cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
+    pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };
 })();

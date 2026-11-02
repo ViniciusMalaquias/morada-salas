@@ -1,9 +1,12 @@
 (async function () {
   const M = window.Morada, sb = M.client;
   const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const show = id => ["#v-out", "#v-reset", "#v-in"].forEach(v => $(v).hidden = v !== id);
   const PLANO = { avulso: "Hora avulsa", pacote: "Pacote de horas", periodo: "Período", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal" };
+  const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
 
   let toastTimer;
   const toast = (msg, isErr) => { const t = $("#toast"); t.textContent = msg; t.classList.toggle("error", !!isErr); t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, isErr ? 6000 : 3000); };
@@ -21,7 +24,7 @@
   if (!sb) { show("#v-out"); err("#l-err", "O site está em modo demonstração."); return; }
 
   // ---------- sessão ----------
-  let started = false;
+  let started = false, me = null, profile = {};
   const recovering = location.hash.includes("type=recovery");
   sb.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") { show("#v-reset"); return; }
@@ -31,12 +34,13 @@
   const { data: { session } } = await sb.auth.getSession();
   if (!session && !recovering) show("#v-out");
 
-  // ---------- abas entrar / criar conta ----------
-  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-selected", x === b));
-    $("#f-login").hidden = b.dataset.t !== "login"; $("#f-signup").hidden = b.dataset.t !== "signup"; $("#s-ok").hidden = true;
-  }));
-  if (location.hash === "#criar") document.querySelector('.seg button[data-t="signup"]').click();
+  // ---------- entrar / criar conta ----------
+  const pickTab = t => {
+    $$(".seg button").forEach(x => x.setAttribute("aria-selected", x.dataset.t === t));
+    $("#f-login").hidden = t !== "login"; $("#f-signup").hidden = t !== "signup"; $("#s-ok").hidden = true;
+  };
+  $$(".seg button").forEach(b => b.addEventListener("click", () => pickTab(b.dataset.t)));
+  if (location.hash === "#criar") pickTab("signup");
 
   $("#f-login").addEventListener("submit", async e => {
     e.preventDefault(); err("#l-err", "");
@@ -65,7 +69,7 @@
     if (!data.session) {
       $("#f-signup").hidden = true;
       const ok = $("#s-ok"); ok.hidden = false;
-      ok.textContent = `Conta criada! Enviamos um e-mail para ${email}. Clique no link do e-mail para ativar a conta e depois entre aqui.`;
+      ok.textContent = `Conta criada! Enviamos um e-mail para ${email}. Clique no link do e-mail para ativar a conta e depois entre aqui. Suas reservas feitas com esse e-mail ou CPF aparecem sozinhas.`;
     }
   });
   $("#f-reset").addEventListener("submit", async e => {
@@ -82,49 +86,116 @@
   $("#f-code").addEventListener("submit", async e => {
     e.preventDefault(); err("#c-err", ""); $("#c-result").innerHTML = "";
     const { data, error } = await sb.rpc("reservation_by_code", { p_codigo: $("#c-code").value, p_telefone: $("#c-tel").value });
-    if (error || !data) return err("#c-err", "Não encontramos uma reserva com esse código e WhatsApp. Confira os dados.");
+    if (error || !data) return err("#c-err", "Não encontramos uma reserva com esse código e telefone ou CPF. Confira os dados.");
     const r = { ...data, slots: null };
-    $("#c-result").innerHTML = resCard(r, true);
+    $("#c-result").innerHTML = (M.statusOf(r, C) === "pendente" ? payCard(r) : "") + resCard(r, true) +
+      `<div class="card cta-acc"><p><b>Crie sua conta</b> para acompanhar todas as suas reservas e recibos num lugar só. Use o mesmo CPF e telefone da reserva que ela aparece sozinha.</p><button type="button" class="btn small" id="cta-signup">Criar conta</button></div>`;
+    paintQrs();
+    $("#cta-signup").onclick = () => { pickTab("signup"); $("#s-nome").focus(); window.scrollTo({ top: 0, behavior: "smooth" }); };
   });
 
   // ---------- área logada ----------
   async function startIn(user) {
-    started = true; show("#v-in");
+    started = true; me = user; show("#v-in");
     const [{ data: prof }, { data: staff }] = await Promise.all([
       sb.from("profiles").select("*").eq("id", user.id).maybeSingle(),
       sb.rpc("is_staff")
     ]);
-    const p = prof || {};
-    $("#hello").textContent = p.nome ? `Olá, ${p.nome.split(" ")[0]}!` : "Olá!";
+    profile = prof || {};
+    $("#hello").textContent = profile.nome ? `Olá, ${profile.nome.split(" ")[0]}!` : "Olá!";
     $("#to-admin").hidden = !staff;
-    $("#p-cpf").value = M.cpfFormat(p.cpf || "");
-    $("#p-nome").value = p.nome || ""; $("#p-tel").value = p.telefone || ""; $("#p-reg").value = p.registro || ""; $("#p-email").value = user.email || "";
-    if (p.profissao) $("#p-prof").value = p.profissao;
+    $("#p-cpf").value = M.cpfFormat(profile.cpf || ""); $("#p-nome").value = profile.nome || ""; $("#p-tel").value = profile.telefone || "";
+    $("#p-reg").value = profile.registro || ""; $("#p-email").value = user.email || "";
+    if (profile.profissao) $("#p-prof").value = profile.profissao;
     const { data: n } = await sb.rpc("claim_my_reservations");
     if (n > 0) toast(`${n > 1 ? `${n} reservas feitas` : "1 reserva feita"} antes do cadastro ${n > 1 ? "foram vinculadas" : "foi vinculada"} à sua conta.`);
-    loadMine(user.id);
+    loadMine();
   }
   $("#logout").addEventListener("click", () => sb.auth.signOut());
-  document.querySelectorAll(".tabs-c button").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs-c button").forEach(x => { x.setAttribute("aria-selected", x === b); $("#" + x.dataset.p).hidden = x !== b; });
+  $$(".tabs-c button").forEach(b => b.addEventListener("click", () => {
+    $$(".tabs-c button").forEach(x => { x.setAttribute("aria-selected", x === b); $("#" + x.dataset.p).hidden = x !== b; });
   }));
 
   let mine = [];
-  async function loadMine(uid) {
+  async function loadMine() {
     const { data, error } = await sb.from("reservations")
-      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,pagamento_forma,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim)")
-      .eq("user_id", uid).order("created_at", { ascending: false }).limit(100);
+      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,room_id,nome,cpf,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim),payments(id,competencia,valor,forma,pago_em)")
+      .eq("user_id", me.id).order("created_at", { ascending: false }).limit(200);
     const box = $("#my-list");
     if (error) { box.innerHTML = `<p class="err">Não foi possível carregar suas reservas.</p>`; return; }
-    mine = data || [];
-    if (!mine.length) { box.innerHTML = `<div class="card empty"><p>Você ainda não tem reservas.</p><a class="btn" href="index.html#salas">Ver salas e horários</a></div>`; return; }
-    const groups = [
-      ["Aguardando pagamento", mine.filter(r => M.statusOf(r, C) === "pendente")],
-      ["Confirmadas", mine.filter(r => r.status === "confirmada")],
-      ["Encerradas", mine.filter(r => ["recusada", "cancelada", "expirada"].includes(M.statusOf(r, C)))]
-    ].filter(g => g[1].length);
-    box.innerHTML = groups.map(([t, list]) => `<h2 class="h3 grp">${t}</h2>${list.map(r => resCard({ ...r, sala: r.rooms?.name, slots: r.reservation_slots }, false)).join("")}`).join("");
+    mine = (data || []).map(r => ({ ...r, sala: r.rooms?.name, slots: r.reservation_slots }));
+    renderHero(); renderPend(); renderList(); renderPays();
   }
+
+  // próxima ocorrência de um horário
+  function nextOcc(s, from = new Date()) {
+    const now = from, today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = M.parse(s.data);
+    if (s.freq === "unica") { const d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), s.hora_ini); return d >= now ? d : null; }
+    let d = start > today ? start : today;
+    for (let i = 0; i < 30; i++) {
+      const diff = Math.round((d - start) / 864e5);
+      if (d.getDay() === start.getDay() && diff >= 0 && (s.freq === "semanal" || (diff / 7) % 2 === 0)) {
+        const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), s.hora_ini);
+        if (at >= now) return at;
+      }
+      d = M.addDays(d, 1);
+    }
+    return null;
+  }
+  function relDay(d) {
+    const now = new Date(), t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t0) / 864e5);
+    if (days === 0) { const h = Math.max(0, Math.round((d - now) / 36e5)); return h <= 0 ? "agora" : `hoje, em ${h}h`; }
+    if (days === 1) return "amanhã";
+    return `em ${days} dias`;
+  }
+
+  function renderHero() {
+    const occ = mine.filter(r => r.status === "confirmada").flatMap(r => (r.slots || []).map(s => ({ r, s, at: nextOcc(s) }))).filter(x => x.at).sort((a, b) => a.at - b.at)[0];
+    const pend = mine.filter(r => M.statusOf(r, C) === "pendente").length;
+    if (!occ) { $("#hero-next").innerHTML = mine.length || pend ? "" : `<div class="hero-next empty"><div><span class="eyebrow">Comece por aqui</span><h2>Reserve sua primeira sala</h2><p class="muted">Escolha a sala, veja os horários livres e faça a pré-reserva em poucos minutos.</p></div><a class="btn" href="index.html#salas">Ver salas</a></div>`; return; }
+    const { r, s, at } = occ;
+    $("#hero-next").innerHTML = `<div class="hero-next">
+      <div class="hn-date"><span>${M.DOW_NAME[at.getDay()]}</span><strong>${at.getDate()}</strong><span>${MESES[at.getMonth()].slice(0, 3)}</span></div>
+      <div class="hn-body"><span class="eyebrow">Próximo atendimento · ${relDay(at)}</span>
+        <h2>${esc(r.sala)}</h2><p>${s.hora_ini}h às ${s.hora_fim}h · ${PLANO[r.plano] || ""}</p></div>
+      <div class="hn-act"><a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Sobre minha reserva ${r.codigo} (${r.sala}), ${M.DOW_NAME[at.getDay()]} ${M.br(at)} às ${s.hora_ini}h:`)}">Falar com a clínica</a></div></div>`;
+  }
+
+  function renderPend() {
+    const pend = mine.filter(r => M.statusOf(r, C) === "pendente");
+    $("#pend-box").innerHTML = pend.map(payCard).join("");
+    paintQrs();
+  }
+
+  function payCard(r) {
+    const exp = M.expiresAt(r, C), left = Math.max(0, exp - Date.now());
+    const hh = Math.floor(left / 36e5), mm = Math.floor(left % 36e5 / 6e4);
+    const payload = C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Number(r.total || 0), txid: r.codigo }) : "";
+    return `<article class="paycard">
+      <div class="pc-info">
+        <span class="pill p-pend">Aguardando pagamento</span>
+        <h2>${M.money(r.total)}<small>${fixo(r) ? " primeira mensalidade" : ""}</small></h2>
+        <p><b>${esc(r.sala || "")}</b> · ${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</p>
+        <p class="countdown" data-exp="${exp.toISOString()}">Pague em até <b>${hh}h ${String(mm).padStart(2, "0")}min</b> para garantir o horário (até ${M.fmtDateTime(exp)}).</p>
+        <p class="muted small">${esc(C.pagamento_texto || "")}</p>
+        <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(r.total)}.`)}">Enviar comprovante</a>
+          <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Prefiro pagar a reserva ${r.codigo} por link de pagamento.`)}">Pedir link de pagamento</a></div>
+      </div>
+      ${payload ? `<div class="pc-pix"><div class="qr" data-qr="${esc(payload)}" aria-label="QR Code Pix"></div>
+        <span class="small muted">Pix copia e cola</span>
+        <div class="copyrow"><input type="text" readonly value="${esc(payload)}" aria-label="Código Pix copia e cola"><button type="button" class="copy" data-copy="${esc(payload)}">Copiar</button></div></div>` : ""}
+    </article>`;
+  }
+  function paintQrs() {
+    if (!window.qrcode) return;
+    $$("[data-qr]").forEach(el => { if (el.dataset.done) return; const q = qrcode(0, "M"); q.addData(el.dataset.qr); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); el.dataset.done = "1"; });
+  }
+  setInterval(() => $$(".countdown[data-exp]").forEach(p => {
+    const left = Math.max(0, new Date(p.dataset.exp) - Date.now());
+    const b = p.querySelector("b"); if (b) b.textContent = left ? `${Math.floor(left / 36e5)}h ${String(Math.floor(left % 36e5 / 6e4)).padStart(2, "0")}min` : "prazo encerrado";
+  }), 30000);
 
   function fmtSlot(s) {
     const d = M.parse(s.data);
@@ -132,34 +203,71 @@
     return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${s.hora_ini}h–${s.hora_fim}h (desde ${M.br(d)})`;
   }
 
+  function steps(st) {
+    const done = st === "confirmada" ? 3 : st === "pendente" ? 1 : 0;
+    const off = ["recusada", "cancelada", "expirada"].includes(st);
+    return `<ol class="steps-r ${off ? "off" : ""}">${["Pré-reserva", "Pagamento", "Confirmada"].map((t, i) => `<li class="${i < done ? "done" : i === done && !off ? "cur" : ""}">${t}</li>`).join("")}</ol>`;
+  }
+
   function resCard(r, guest) {
     const st = M.statusOf(r, C);
-    const lines = r.slots ? r.slots.sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot)
+    const lines = r.slots ? r.slots.slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot)
       : String(r.resumo || "").split("\n").filter(l => l && !/^Plano:|^Total|^Estimativa/.test(l));
-    const pay = st === "pendente" ? `
-      <div class="paybox">
-        <p><b>Pague até ${M.fmtDateTime(M.expiresAt(r, C))}</b> para garantir o horário. ${r.total ? `Valor: <b>${M.money(r.total)}</b>${r.plano === "semanal" || r.plano === "quinzenal" ? " por mês" : ""}.` : ""}</p>
-        ${C.pix_chave ? `<div class="pix"><span>Pix (${esc(C.pix_nome || "")}):</span> <code>${esc(C.pix_chave)}</code> <button type="button" class="copy" data-copy="${esc(C.pix_chave)}">Copiar</button></div>` : ""}
-        <p class="muted small">${esc(C.pagamento_texto || "")}</p>
-        <a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}).`)}">Enviar comprovante no WhatsApp</a>
-      </div>` : st === "expirada" ? `<p class="muted small">O prazo de pagamento passou e o horário foi liberado. Se ainda quiser, fale com a clínica ou faça uma nova reserva.</p>` : "";
-    const canCancel = !guest && (r.status === "pendente" || r.status === "confirmada");
+    const canCancel = !guest && (st === "pendente" || st === "confirmada");
+    const acts = guest ? "" : `
+      ${r.room_id ? `<a class="btn ghost small" href="sala.html?id=${encodeURIComponent(r.room_id)}">Reservar de novo</a>` : ""}
+      ${r.status === "confirmada" ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Gostaria de remarcar um horário da reserva ${r.codigo} (${r.sala || ""}).`)}">Pedir remarcação</a>` : ""}
+      ${canCancel ? `<button type="button" class="linkbtn danger-text" data-cancel>Cancelar reserva</button>` : ""}`;
     return `<article class="card myres st-${st}" data-id="${r.id || ""}">
-      <div class="myres-head"><span class="pill">${M.STATUS_CLIENTE[st]}</span><strong>${esc(r.sala || "")}</strong>
-        <span class="muted small">${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</span></div>
+      <div class="myres-head"><div><strong>${esc(r.sala || "")}</strong><span class="muted small">${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</span></div><span class="pill">${M.STATUS_CLIENTE[st]}</span></div>
+      ${steps(st)}
       <ul class="myres-slots">${(lines.length ? lines : ["Horários a combinar com a clínica"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${r.total && st !== "pendente" ? `<p class="small muted">Valor: ${M.money(r.total)}${r.plano === "semanal" || r.plano === "quinzenal" ? " por mês (estimativa)" : ""}</p>` : ""}
-      ${pay}
-      ${canCancel ? `<div class="myres-actions"><button type="button" class="linkbtn danger-text" data-cancel>Cancelar reserva</button></div>` : ""}
+      ${r.total ? `<p class="small muted">Valor: <b>${M.money(r.total)}</b>${fixo(r) ? " por mês" : ""}${r.pago_em ? ` · pago em ${M.fmtDateTime(new Date(r.pago_em))}` : ""}</p>` : ""}
+      ${st === "expirada" ? `<p class="muted small">O prazo de pagamento passou e o horário foi liberado. Se ainda quiser, fale com a clínica ou faça uma nova reserva.</p>` : ""}
+      ${acts.trim() ? `<div class="myres-actions">${acts}</div>` : ""}
     </article>`;
   }
 
-  // copiar Pix / cancelar
+  function renderList() {
+    const box = $("#my-list");
+    if (!mine.length) { box.innerHTML = `<div class="card empty"><p>Você ainda não tem reservas.</p><a class="btn" href="index.html#salas">Ver salas e horários</a></div>`; return; }
+    const groups = [
+      ["Ativas", mine.filter(r => ["pendente", "confirmada"].includes(M.statusOf(r, C)))],
+      ["Histórico", mine.filter(r => ["recusada", "cancelada", "expirada"].includes(M.statusOf(r, C)))]
+    ].filter(g => g[1].length);
+    box.innerHTML = groups.map(([t, list]) => `<h2 class="h3 grp">${t}</h2>${list.map(r => resCard(r, false)).join("")}`).join("");
+  }
+
+  function renderPays() {
+    const pays = mine.flatMap(r => (r.payments || []).map(p => ({ ...p, r }))).sort((a, b) => new Date(b.pago_em) - new Date(a.pago_em));
+    $("#pay-list").innerHTML = pays.length ? `<ul class="plist">${pays.map(p => `<li>
+      <span><b>${M.money(p.valor)}</b><small>${M.fmtDateTime(new Date(p.pago_em))} · ${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.r.sala || "")} · ${esc(p.forma || "")}</small></span>
+      <button type="button" class="btn ghost small" data-rec="${p.id}">Recibo</button></li>`).join("")}</ul>`
+      : `<p class="muted">Os pagamentos confirmados pela clínica aparecem aqui, com recibo.</p>`;
+    $("#pay-list").onclick = e => { const b = e.target.closest("[data-rec]"); if (b) openRecibo(pays.find(p => p.id === b.dataset.rec)); };
+  }
+
+  function openRecibo(p) {
+    const r = p.r;
+    $("#recibo-body").innerHTML = `<div class="rec">
+      <div class="rec-head"><span class="logo" aria-hidden="true"></span><div><b>Clínica Morada do Ser</b><small>${esc(C.endereco)} · ${esc(C.bairro_cidade)}</small><small>${esc(C.telefone)} · ${esc(C.email)}</small></div></div>
+      <h2>Recibo</h2>
+      <p>Recebemos de <b>${esc(profile.nome || r.nome || "")}</b>${(profile.cpf || r.cpf) ? `, CPF ${esc(M.cpfFormat(profile.cpf || r.cpf))}` : ""}, a quantia de <b>${M.money(p.valor)}</b>,
+      referente à locação da <b>${esc(r.sala || "")}</b> (${PLANO[r.plano]}${p.competencia ? `, mensalidade de ${MESES[M.parse(p.competencia).getMonth()]} de ${M.parse(p.competencia).getFullYear()}` : ""}).</p>
+      <dl class="rec-dl"><dt>Código da reserva</dt><dd>${esc(r.codigo)}</dd><dt>Data do pagamento</dt><dd>${new Date(p.pago_em).toLocaleDateString("pt-BR")}</dd><dt>Forma</dt><dd>${esc(p.forma || "—")}</dd>
+      <dt>Horários</dt><dd>${(r.slots || []).map(fmtSlot).map(esc).join("<br>") || "—"}</dd></dl>
+      <p class="rec-sign">Jundiaí, ${new Date(p.pago_em).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}.</p></div>`;
+    $("#recibo").hidden = false;
+  }
+  $("#recibo").addEventListener("click", e => { if (e.target.closest("[data-close-rec]")) $("#recibo").hidden = true; });
+  $("#rec-print").onclick = () => window.print();
+
+  // copiar / cancelar
   document.addEventListener("click", async e => {
     const c = e.target.closest("[data-copy]");
     if (c) {
-      try { await navigator.clipboard.writeText(c.dataset.copy); toast("Chave Pix copiada."); }
-      catch { const r = document.createRange(); r.selectNodeContents(c.previousElementSibling); getSelection().removeAllRanges(); getSelection().addRange(r); }
+      try { await navigator.clipboard.writeText(c.dataset.copy); toast("Código Pix copiado. Cole no app do seu banco."); }
+      catch { const i = c.parentElement.querySelector("input"); i?.select(); }
       return;
     }
     const x = e.target.closest("[data-cancel]");
@@ -170,13 +278,13 @@
       box.dataset.id = card.dataset.id;
       return;
     }
-    if (e.target.closest("[data-cancel-no]")) { const u = await M.getUser(); loadMine(u.id); return; }
+    if (e.target.closest("[data-cancel-no]")) { renderList(); return; }
     const y = e.target.closest("[data-cancel-yes]");
     if (y) {
       y.disabled = true;
       const { error } = await sb.rpc("cancel_my_reservation", { p_id: y.parentElement.dataset.id });
       if (error) { toast(error.message, true); y.disabled = false; return; }
-      toast("Reserva cancelada."); const u = await M.getUser(); loadMine(u.id);
+      toast("Reserva cancelada."); loadMine();
     }
   });
 
@@ -184,21 +292,20 @@
     e.preventDefault(); err("#k-err", "");
     const { error } = await sb.rpc("claim_reservation", { p_codigo: $("#k-code").value, p_telefone: $("#k-tel").value });
     if (error) return err("#k-err", error.message);
-    toast("Reserva vinculada à sua conta."); $("#f-claim").reset();
-    const u = await M.getUser(); loadMine(u.id);
+    toast("Reserva vinculada à sua conta."); $("#f-claim").reset(); loadMine();
   });
 
   $("#f-perfil").addEventListener("submit", async e => {
     e.preventDefault();
-    const u = await M.getUser();
-    const row = { id: u.id, email: u.email, nome: $("#p-nome").value.trim(), cpf: M.onlyDigits($("#p-cpf").value), telefone: $("#p-tel").value.trim(), profissao: $("#p-prof").value, registro: $("#p-reg").value.trim(), updated_at: new Date().toISOString() };
+    const row = { id: me.id, email: me.email, nome: $("#p-nome").value.trim(), cpf: M.onlyDigits($("#p-cpf").value), telefone: $("#p-tel").value.trim(), profissao: $("#p-prof").value, registro: $("#p-reg").value.trim(), updated_at: new Date().toISOString() };
     if (!M.fullName(row.nome)) return toast("Preencha seu nome completo.", true);
     if (!M.cpfValid(row.cpf)) return toast("CPF inválido. Confira os números.", true);
     if (row.telefone.replace(/\D/g, "").length < 10) return toast("Preencha o telefone de contato com DDD.", true);
     const { error } = await sb.from("profiles").upsert(row);
     if (error) return toast(/profiles_cpf_idx|duplicate/.test(error.message) ? "Este CPF já está em outra conta. Fale com a clínica." : "Não foi possível salvar. Tente de novo.", true);
-    const { data: n } = await sb.rpc("claim_my_reservations");
-    if (n > 0) loadMine(u.id);
+    profile = { ...profile, ...row };
     $("#hello").textContent = `Olá, ${row.nome.split(" ")[0]}!`; toast("Dados salvos.");
+    const { data: n } = await sb.rpc("claim_my_reservations");
+    if (n > 0) loadMine();
   });
 })();

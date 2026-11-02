@@ -1,0 +1,564 @@
+// Painel da equipe: início, agenda, reservas, clientes, financeiro, equipe e painel lateral de detalhes.
+(function () {
+  const M = window.Morada, sb = M.client;
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const A = () => window.MoradaAdmin;
+  const PLANO = { avulso: "Hora avulsa", pacote: "Pacote", periodo: "Período", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal", bloqueio: "Bloqueio" };
+  const FORMAS = ["Pix", "Link de pagamento", "Cartão na clínica", "Dinheiro", "Outro"];
+  const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
+
+  let C = M.DEFAULTS, rooms = [], all = [], bound = false, current = "inicio";
+  let agView = "dia", agDate = startOfDay(new Date()), rsFilter = "pendente", fiMonth = monthStart(new Date());
+
+  function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function monthStart(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  const todayIso = () => M.iso(new Date());
+  const roomName = id => rooms.find(r => r.id === id)?.name || "";
+  const st = r => r.plano === "bloqueio" ? "bloqueio" : M.statusOf(r, C);
+  const PILL = { pendente: ["Aguardando pagamento", "p-pend"], expirada: ["Prazo vencido", "p-exp"], confirmada: ["Confirmada", "p-conf"], recusada: ["Recusada", "p-off"], cancelada: ["Cancelada", "p-off"], bloqueio: ["Bloqueio", "p-blk"] };
+  const pill = r => { const [t, c] = PILL[st(r)]; return `<span class="pill ${c}">${t}</span>`; };
+  const waNum = t => { let d = M.onlyDigits(t); if (d.length === 10 || d.length === 11) d = "55" + d; return d; };
+  const first = n => String(n || "").split(" ")[0];
+  const H = () => C.horarios || M.DEFAULTS.horarios;
+  const openOf = d => H()[M.DOW_NAME[d.getDay()]] || null;
+  const paidTotal = r => (r.payments || []).reduce((s, p) => s + Number(p.valor || 0), 0);
+
+  function fmtSlot(s) {
+    const d = M.parse(s.data);
+    if (s.freq === "unica") return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}, ${s.hora_ini}h–${s.hora_fim}h`;
+    return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${s.hora_ini}h–${s.hora_fim}h (desde ${M.br(d)})`;
+  }
+  const slotsText = r => (r.reservation_slots || []).slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot);
+
+  // reserva ocupa a agenda?
+  const active = r => r.status === "confirmada" || (r.status === "pendente" && M.statusOf(r, C) === "pendente");
+  // ocorrências de uma reserva num dia
+  function occursOn(s, d) {
+    const di = M.iso(d);
+    if (s.freq === "unica") return s.data === di;
+    const sd = M.parse(s.data), diff = Math.round((d - sd) / 864e5);
+    return diff >= 0 && d.getDay() === sd.getDay() && (s.freq === "semanal" || (diff / 7) % 2 === 0);
+  }
+  function dayEvents(d, roomId) {
+    const out = [];
+    all.filter(active).forEach(r => (r.reservation_slots || []).forEach(s => {
+      if ((!roomId || s.room_id === roomId) && occursOn(s, d)) out.push({ r, s });
+    }));
+    return out.sort((a, b) => a.s.hora_ini - b.s.hora_ini);
+  }
+
+  window.addEventListener("morada:start", init);
+  window.addEventListener("morada:page", e => { current = e.detail; render(); });
+
+  async function init() {
+    try {
+      [rooms, C] = await Promise.all([M.loadRooms({ includeInactive: true }), M.loadContent()]);
+    } catch (e) { return A().fail("Erro ao carregar dados", e); }
+    if (!bound) bind();
+    bound = true;
+    await reload();
+    renderStaff();
+  }
+
+  async function reload() {
+    const { data, error } = await sb.from("reservations")
+      .select("*, reservation_slots(id,freq,data,hora_ini,hora_fim,room_id), payments(id,competencia,valor,forma,obs,pago_em)")
+      .order("created_at", { ascending: false }).limit(2000);
+    if (error) return A().fail("Erro ao carregar reservas", error);
+    all = data || [];
+    const pend = all.filter(r => st(r) === "pendente").length;
+    const b = $("#pend-count"); b.textContent = pend || ""; b.hidden = !pend;
+    render();
+  }
+
+  function render() {
+    if (!all) return;
+    if (current === "inicio") renderInicio();
+    if (current === "agenda") renderAgenda();
+    if (current === "reservas") renderReservas();
+    if (current === "clientes") renderClientes();
+    if (current === "financeiro") renderFinanceiro();
+    if (current === "equipe") renderStaff();
+  }
+
+  function bind() {
+    $$("[data-view]").forEach(b => b.onclick = () => { agView = b.dataset.view; $$("[data-view]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderAgenda(); });
+    $("#ag-prev").onclick = () => { agDate = M.addDays(agDate, agView === "dia" ? -1 : -7); renderAgenda(); };
+    $("#ag-next").onclick = () => { agDate = M.addDays(agDate, agView === "dia" ? 1 : 7); renderAgenda(); };
+    $("#ag-today").onclick = () => { agDate = startOfDay(new Date()); renderAgenda(); };
+    $("#ag-sala").innerHTML = rooms.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+    $("#ag-sala").onchange = renderAgenda;
+    $("#cal-grid").addEventListener("click", e => {
+      const ev = e.target.closest("[data-res]"); if (ev) return openRes(ev.dataset.res);
+      const c = e.target.closest("[data-new]"); if (c) openNew(c.dataset.room, c.dataset.date, +c.dataset.h);
+    });
+    $$(".chips-f button").forEach(b => b.onclick = () => { rsFilter = b.dataset.f; $$(".chips-f button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderReservas(); });
+    $("#rs-q").oninput = renderReservas;
+    $("#cl-q").oninput = renderClientes;
+    $("#fi-prev").onclick = () => { fiMonth = new Date(fiMonth.getFullYear(), fiMonth.getMonth() - 1, 1); renderFinanceiro(); };
+    $("#fi-next").onclick = () => { fiMonth = new Date(fiMonth.getFullYear(), fiMonth.getMonth() + 1, 1); renderFinanceiro(); };
+    $("#fi-csv").onclick = downloadCsv;
+    document.addEventListener("click", e => {
+      const r = e.target.closest("[data-open-res]"); if (r) { e.preventDefault(); openRes(r.dataset.openRes); }
+      const c = e.target.closest("[data-open-cli]"); if (c) { e.preventDefault(); openCliente(c.dataset.openCli); }
+      const m = e.target.closest("[data-mens]"); if (m) { e.preventDefault(); openMensalidade(m.dataset.mens, m.dataset.comp); }
+    });
+    $("#drawer").addEventListener("click", e => { if (e.target.closest("[data-close]")) closeDrawer(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#drawer").hidden) closeDrawer(); });
+    $("#f-staff").addEventListener("submit", addStaff);
+    $("#staff-list").addEventListener("click", removeStaff);
+  }
+
+  // ================= INÍCIO =================
+  function weekStats() {
+    const ws = M.monday(new Date()), days = [0, 1, 2, 3, 4, 5, 6].map(i => M.addDays(ws, i));
+    return rooms.filter(r => r.active).map(room => {
+      let open = 0, used = 0;
+      days.forEach(d => { const o = openOf(d); if (!o) return; open += o[1] - o[0]; dayEvents(d, room.id).forEach(({ s }) => used += s.hora_fim - s.hora_ini); });
+      return { room, open, used, pct: open ? Math.round(used / open * 100) : 0 };
+    });
+  }
+  function mensalidades(month) {
+    const ms = monthStart(month), me = new Date(ms.getFullYear(), ms.getMonth() + 1, 0), comp = M.iso(ms);
+    return all.filter(r => r.status === "confirmada" && fixo(r) && (r.reservation_slots || []).some(s => s.data <= M.iso(me))).map(r => {
+      const pay = (r.payments || []).find(p => p.competencia === comp);
+      const venc = new Date(ms.getFullYear(), ms.getMonth(), 5, 23, 59);
+      const status = pay ? "paga" : new Date() > venc ? "atrasada" : "aberta";
+      return { r, comp, pay, status, valor: Number(r.total || 0) };
+    });
+  }
+  function renderInicio() {
+    const now = new Date(), today = startOfDay(now);
+    const pend = all.filter(r => st(r) === "pendente");
+    const recMes = all.flatMap(r => r.payments || []).filter(p => { const d = new Date(p.pago_em); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).reduce((s, p) => s + Number(p.valor), 0);
+    const ev = dayEvents(today).filter(x => x.r.plano !== "bloqueio");
+    const ws = weekStats(), tot = ws.reduce((a, w) => [a[0] + w.used, a[1] + w.open], [0, 0]);
+    const mens = mensalidades(now).filter(m => m.status !== "paga");
+    $("#kpis").innerHTML = [
+      kpi("Aguardando pagamento", pend.length, pend.length ? `${M.money(pend.reduce((s, r) => s + Number(r.total || 0), 0))} a receber` : "Nada pendente", "reservas", pend.length ? "warn" : ""),
+      kpi(`Recebido em ${MESES[now.getMonth()]}`, M.money(recMes), "pagamentos registrados", "financeiro"),
+      kpi("Atendimentos hoje", ev.length, ev.length ? `${ev.reduce((s, x) => s + x.s.hora_fim - x.s.hora_ini, 0)}h reservadas` : "Agenda livre", "agenda"),
+      kpi("Ocupação da semana", `${tot[1] ? Math.round(tot[0] / tot[1] * 100) : 0}%`, `${tot[0]}h de ${tot[1]}h disponíveis`, "agenda"),
+      kpi("Mensalidades em aberto", mens.length, mens.filter(m => m.status === "atrasada").length ? `${mens.filter(m => m.status === "atrasada").length} atrasada(s)` : "deste mês", "financeiro", mens.some(m => m.status === "atrasada") ? "warn" : "")
+    ].join("");
+    $$("#kpis [data-go]").forEach(k => k.onclick = () => A().go(k.dataset.go));
+
+    $("#today-label").textContent = `${M.DOW_LONG[now.getDay()]}, ${M.br(now)}`;
+    $("#today-list").innerHTML = ev.length ? ev.map(({ r, s }) => `
+      <button type="button" class="tl-item ${s.hora_fim <= now.getHours() ? "past" : s.hora_ini <= now.getHours() ? "now" : ""}" data-open-res="${r.id}">
+        <span class="tl-time">${s.hora_ini}h<small>${s.hora_fim}h</small></span>
+        <span class="tl-body"><b>${esc(r.nome)}</b><small>${esc(roomName(s.room_id))} · ${PLANO[r.plano]}</small></span>${pill(r)}</button>`).join("")
+      : `<p class="empty-s">Nenhum atendimento hoje.</p>`;
+
+    const att = [];
+    pend.forEach(r => { const left = (M.expiresAt(r, C) - now) / 36e5; att.push({ w: left, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot ${left < 3 ? "red" : "amber"}"></span><span><b>${esc(r.nome)}</b> aguarda pagamento<small>${esc(roomName(r.room_id))} · ${M.money(r.total)} · vence ${left < 1 ? "em menos de 1h" : `em ${Math.floor(left)}h`}</small></span></button>` }); });
+    all.filter(r => st(r) === "expirada" && (now - M.expiresAt(r, C)) < 7 * 864e5).forEach(r => att.push({ w: 1000, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot gray"></span><span><b>${esc(r.nome)}</b>: prazo de pagamento venceu<small>O horário foi liberado. Recuse ou confirme se ainda estiver livre.</small></span></button>` }));
+    mens.filter(m => m.status === "atrasada").forEach(m => att.push({ w: -1, html: `<button type="button" class="att" data-mens="${m.r.id}" data-comp="${m.comp}"><span class="dot red"></span><span><b>${esc(m.r.nome)}</b>: mensalidade de ${MESES[now.getMonth()]} atrasada<small>${esc(roomName(m.r.room_id))} · ${M.money(m.valor)}</small></span></button>` }));
+    $("#attention").innerHTML = att.length ? att.sort((a, b) => a.w - b.w).map(a => a.html).join("") : `<p class="empty-s">Tudo em dia. ✓</p>`;
+
+    $("#occ-bars").innerHTML = ws.length ? ws.map(w => `<div class="bar-row"><span>${esc(w.room.name)}</span><div class="bar"><i style="width:${w.pct}%"></i></div><b>${w.pct}%</b></div>`).join("") : `<p class="empty-s">Nenhuma sala ativa.</p>`;
+
+    const months = [5, 4, 3, 2, 1, 0].map(i => new Date(now.getFullYear(), now.getMonth() - i, 1));
+    const vals = months.map(m => all.flatMap(r => r.payments || []).filter(p => { const d = new Date(p.pago_em); return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear(); }).reduce((s, p) => s + Number(p.valor), 0));
+    const max = Math.max(...vals, 1);
+    $("#rev-chart").innerHTML = months.map((m, i) => `<div class="rev-col" title="${M.money(vals[i])}"><span class="rev-v">${vals[i] ? M.money(vals[i]).replace(",00", "") : ""}</span><div class="rev-bar ${i === 5 ? "cur" : ""}" style="height:${Math.max(2, vals[i] / max * 100)}%"></div><span class="rev-m">${MESES[m.getMonth()].slice(0, 3)}</span></div>`).join("");
+  }
+  function kpi(label, value, sub, go, cls = "") {
+    return `<button type="button" class="kpi ${cls}" data-go="${go}"><span class="kpi-l">${label}</span><strong>${value}</strong><small>${sub}</small></button>`;
+  }
+
+  // ================= AGENDA =================
+  function renderAgenda() {
+    const grid = $("#cal-grid");
+    $("#ag-sala").hidden = agView !== "semana";
+    if (!$("#ag-sala").value && rooms[0]) $("#ag-sala").value = rooms[0].id;
+    let cols, label;
+    if (agView === "dia") {
+      cols = rooms.filter(r => r.active || dayEvents(agDate, r.id).length).map(r => ({ key: r.id, label: r.name, room: r.id, date: agDate }));
+      label = `${M.DOW_LONG[agDate.getDay()]}, ${agDate.getDate()} de ${MESES[agDate.getMonth()]}`;
+    } else {
+      const ws = M.monday(agDate);
+      cols = [0, 1, 2, 3, 4, 5, 6].map(i => M.addDays(ws, i)).filter(d => openOf(d)).map(d => ({ key: M.iso(d), label: `${M.DOW_NAME[d.getDay()]} ${M.br(d)}`, room: $("#ag-sala").value, date: d }));
+      label = `Semana de ${M.br(ws)} a ${M.br(M.addDays(ws, 6))}`;
+    }
+    $("#ag-label").textContent = label.charAt(0).toUpperCase() + label.slice(1);
+    const opens = cols.map(c => openOf(c.date)).filter(Boolean);
+    if (!cols.length || !opens.length) { grid.style.gridTemplateColumns = ""; grid.innerHTML = `<p class="empty-s">${agView === "dia" ? "A clínica não abre neste dia." : "Nenhuma sala cadastrada."}</p>`; return; }
+    const h0 = Math.min(...opens.map(o => o[0])), h1 = Math.max(...opens.map(o => o[1]));
+    grid.style.gridTemplateColumns = `52px repeat(${cols.length}, minmax(120px, 1fr))`;
+    grid.style.gridTemplateRows = `auto repeat(${h1 - h0}, 52px)`;
+    const now = new Date();
+    let html = `<div class="cg-corner"></div>` + cols.map((c, i) => `<div class="cg-head ${M.iso(c.date) === todayIso() && agView === "semana" ? "today" : ""}" style="grid-column:${i + 2}">${esc(c.label)}</div>`).join("");
+    for (let h = h0; h < h1; h++) html += `<div class="cg-hour" style="grid-row:${h - h0 + 2}">${h}h</div>`;
+    cols.forEach((c, i) => {
+      const o = openOf(c.date);
+      for (let h = h0; h < h1; h++) {
+        const closed = !o || h < o[0] || h >= o[1];
+        const past = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate(), h + 1) < now;
+        html += closed ? `<div class="cg-cell closed" style="grid-column:${i + 2};grid-row:${h - h0 + 2}"></div>`
+          : `<button type="button" class="cg-cell ${past ? "past" : ""}" style="grid-column:${i + 2};grid-row:${h - h0 + 2}" data-new data-room="${c.room}" data-date="${M.iso(c.date)}" data-h="${h}" aria-label="Criar reserva ${c.label} às ${h}h"><span>+</span></button>`;
+      }
+      dayEvents(c.date, c.room).forEach(({ r, s }) => {
+        const cls = r.plano === "bloqueio" ? "blk" : st(r) === "pendente" ? "pend" : "conf";
+        const a = Math.max(s.hora_ini, h0), b = Math.min(s.hora_fim, h1); if (b <= a) return;
+        html += `<button type="button" class="cg-ev ${cls}" style="grid-column:${i + 2};grid-row:${a - h0 + 2} / ${b - h0 + 2}" data-res="${r.id}">
+          <b>${esc(r.plano === "bloqueio" ? r.nome : first(r.nome) + " " + (r.nome.split(" ").slice(-1)[0] || ""))}</b><small>${s.hora_ini}h–${s.hora_fim}h · ${PLANO[r.plano]}</small></button>`;
+      });
+    });
+    grid.innerHTML = html;
+  }
+
+  // ================= RESERVAS =================
+  function matches(r, q) {
+    if (!q) return true;
+    const d = M.onlyDigits(q), t = q.toLowerCase();
+    return (r.nome || "").toLowerCase().includes(t) || (r.codigo || "").toLowerCase().includes(t) || (r.email || "").toLowerCase().includes(t)
+      || (d.length >= 3 && (M.onlyDigits(r.telefone).includes(d) || (r.cpf || "").includes(d)));
+  }
+  function renderReservas() {
+    const q = $("#rs-q").value.trim();
+    const list = all.filter(r => {
+      const s = st(r);
+      if (rsFilter === "pendente" && s !== "pendente") return false;
+      if (rsFilter === "confirmada" && s !== "confirmada") return false;
+      if (rsFilter === "encerradas" && !["recusada", "cancelada", "expirada"].includes(s)) return false;
+      if (rsFilter === "bloqueio" && !(s === "bloqueio" && r.status === "confirmada")) return false;
+      if (rsFilter !== "bloqueio" && rsFilter !== "todas" && s === "bloqueio") return false;
+      return matches(r, q);
+    });
+    if (rsFilter === "pendente") list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    $("#rs-table").innerHTML = `<thead><tr><th>Cliente</th><th>Sala e plano</th><th>Horários</th><th class="num">Valor</th><th>Status</th><th>Pedido em</th></tr></thead><tbody>${
+      list.length ? list.map(r => `<tr data-open-res="${r.id}" tabindex="0">
+        <td><b>${esc(r.nome)}</b><small>${r.plano === "bloqueio" ? "Uso da clínica" : `${esc(r.codigo)} · ${r.user_id ? "com conta" : "visitante"}`}</small></td>
+        <td>${esc(roomName(r.room_id))}<small>${PLANO[r.plano]}</small></td>
+        <td class="clip">${esc(slotsText(r)[0] || "A combinar")}${(r.reservation_slots || []).length > 1 ? `<small>+${r.reservation_slots.length - 1} horário(s)</small>` : ""}</td>
+        <td class="num">${r.total ? M.money(r.total) : "—"}${fixo(r) ? "<small>/mês</small>" : ""}</td>
+        <td>${pill(r)}</td>
+        <td>${M.fmtDateTime(new Date(r.created_at))}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="empty-s">Nenhuma reserva aqui.</td></tr>`}</tbody>`;
+  }
+
+  // ================= CLIENTES =================
+  function clientes() {
+    const map = new Map();
+    all.filter(r => r.plano !== "bloqueio").forEach(r => {
+      const key = r.cpf || (r.email || "").toLowerCase() || M.onlyDigits(r.telefone).slice(-8) || r.id;
+      const c = map.get(key) || { key, nome: r.nome, telefone: r.telefone, email: r.email, cpf: r.cpf, conta: false, res: [], pago: 0, last: r.created_at };
+      c.res.push(r); c.pago += paidTotal(r); c.conta ||= !!r.user_id;
+      if (r.created_at >= c.last) { c.last = r.created_at; c.nome = r.nome; c.telefone = r.telefone || c.telefone; c.email = r.email || c.email; }
+      map.set(key, c);
+    });
+    return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+  }
+  function renderClientes() {
+    const q = $("#cl-q").value.trim().toLowerCase(), d = M.onlyDigits(q);
+    const list = clientes().filter(c => !q || c.nome.toLowerCase().includes(q) || (c.email || "").toLowerCase().includes(q) || (d.length >= 3 && ((c.cpf || "").includes(d) || M.onlyDigits(c.telefone).includes(d))));
+    $("#cl-table").innerHTML = `<thead><tr><th>Cliente</th><th>Contato</th><th class="num">Reservas</th><th class="num">Total pago</th><th>Última reserva</th></tr></thead><tbody>${
+      list.length ? list.map(c => `<tr data-open-cli="${esc(c.key)}" tabindex="0">
+        <td><b>${esc(c.nome)}</b><small>${c.cpf ? esc(M.cpfFormat(c.cpf)) : "sem CPF"}${c.conta ? " · com conta" : ""}</small></td>
+        <td>${esc(c.telefone)}<small>${esc(c.email)}</small></td>
+        <td class="num">${c.res.length}<small>${c.res.filter(r => r.status === "confirmada").length} confirmada(s)</small></td>
+        <td class="num">${M.money(c.pago)}</td>
+        <td>${M.fmtDateTime(new Date(c.last))}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty-s">Nenhum cliente ainda.</td></tr>`}</tbody>`;
+  }
+
+  // ================= FINANCEIRO =================
+  function paymentsOfMonth(m) {
+    return all.flatMap(r => (r.payments || []).map(p => ({ ...p, r }))).filter(p => { const d = new Date(p.pago_em); return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear(); })
+      .sort((a, b) => new Date(b.pago_em) - new Date(a.pago_em));
+  }
+  function renderFinanceiro() {
+    $("#fi-label").textContent = `${MESES[fiMonth.getMonth()].replace(/^./, c => c.toUpperCase())} de ${fiMonth.getFullYear()}`;
+    const pays = paymentsOfMonth(fiMonth), mens = mensalidades(fiMonth);
+    const rec = pays.reduce((s, p) => s + Number(p.valor), 0);
+    const pend = all.filter(r => st(r) === "pendente");
+    const mensOpen = mens.filter(m => m.status !== "paga");
+    $("#fi-kpis").innerHTML = [
+      kpi("Recebido no mês", M.money(rec), `${pays.length} pagamento(s)`, "financeiro"),
+      kpi("Pré-reservas a receber", M.money(pend.reduce((s, r) => s + Number(r.total || 0), 0)), `${pend.length} aguardando pagamento`, "reservas", pend.length ? "warn" : ""),
+      kpi("Mensalidades do mês", `${mens.length - mensOpen.length}/${mens.length}`, mensOpen.length ? `${M.money(mensOpen.reduce((s, m) => s + m.valor, 0))} em aberto` : "todas pagas", "financeiro", mensOpen.some(m => m.status === "atrasada") ? "warn" : "")
+    ].join("");
+    $$("#fi-kpis [data-go]").forEach(k => k.onclick = () => A().go(k.dataset.go));
+    const SM = { paga: ["Paga", "p-conf"], aberta: ["Em aberto", "p-pend"], atrasada: ["Atrasada", "p-late"] };
+    $("#fi-mens").innerHTML = `<thead><tr><th>Cliente</th><th>Sala e plano</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead><tbody>${
+      mens.length ? mens.map(m => `<tr>
+        <td><b>${esc(m.r.nome)}</b><small>${esc(m.r.telefone)}</small></td>
+        <td>${esc(roomName(m.r.room_id))}<small>${PLANO[m.r.plano]} · ${esc(slotsText(m.r).join("; "))}</small></td>
+        <td class="num">${M.money(m.pay ? m.pay.valor : m.valor)}</td>
+        <td><span class="pill ${SM[m.status][1]}">${SM[m.status][0]}</span>${m.pay ? `<small>${M.fmtDateTime(new Date(m.pay.pago_em))} · ${esc(m.pay.forma)}</small>` : ""}</td>
+        <td class="act">${m.pay ? "" : `<button type="button" class="btn small" data-mens="${m.r.id}" data-comp="${m.comp}">Registrar</button>
+          <a class="btn ghost small" target="_blank" rel="noopener" href="${waCobrancaMensal(m)}">Cobrar</a>`}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty-s">Nenhum plano fixo ativo neste mês.</td></tr>`}</tbody>`;
+    $("#fi-pays").innerHTML = `<thead><tr><th>Data</th><th>Cliente</th><th>Referência</th><th>Forma</th><th class="num">Valor</th></tr></thead><tbody>${
+      pays.length ? pays.map(p => `<tr data-open-res="${p.r.id}" tabindex="0">
+        <td>${M.fmtDateTime(new Date(p.pago_em))}</td><td><b>${esc(p.r.nome)}</b><small>${esc(roomName(p.r.room_id))}</small></td>
+        <td>${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : PLANO[p.r.plano]}<small>${esc(p.r.codigo)}</small></td>
+        <td>${esc(p.forma || "—")}</td><td class="num">${M.money(p.valor)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty-s">Nenhum pagamento registrado neste mês.</td></tr>`}</tbody>`;
+  }
+  function waCobrancaMensal(m) {
+    const mes = MESES[M.parse(m.comp).getMonth()];
+    const msg = `Olá, ${first(m.r.nome)}! Tudo bem? Passando para lembrar da mensalidade de ${mes} da ${roomName(m.r.room_id)} (${PLANO[m.r.plano].toLowerCase()}): ${M.money(m.valor)}.${C.pix_chave ? `\nPix: ${C.pix_chave} (${C.pix_nome || ""})` : ""}\nDepois é só mandar o comprovante por aqui. Obrigada!`;
+    return `https://wa.me/${waNum(m.r.telefone)}?text=${encodeURIComponent(msg)}`;
+  }
+  function downloadCsv() {
+    const pays = paymentsOfMonth(fiMonth);
+    const rows = [["Data", "Cliente", "CPF", "Sala", "Plano", "Referência", "Forma", "Valor", "Código"]].concat(pays.map(p => [
+      new Date(p.pago_em).toLocaleString("pt-BR"), p.r.nome, p.r.cpf ? M.cpfFormat(p.r.cpf) : "", roomName(p.r.room_id), PLANO[p.r.plano],
+      p.competencia ? `Mensalidade ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva", p.forma, String(p.valor).replace(".", ","), p.r.codigo]));
+    const csv = "﻿" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `pagamentos-${fiMonth.getFullYear()}-${M.pad(fiMonth.getMonth() + 1)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  // ================= PAINEL LATERAL =================
+  function openDrawer(title, html) {
+    $("#dr-title").textContent = title; $("#dr-body").innerHTML = html;
+    $("#drawer").hidden = false; document.body.classList.add("noscroll");
+    setTimeout(() => $("#drawer .drawer-panel").classList.add("in"), 10);
+  }
+  function closeDrawer() { $("#drawer .drawer-panel").classList.remove("in"); $("#drawer").hidden = true; document.body.classList.remove("noscroll"); }
+
+  function waLink(r, kind) {
+    const resumo = slotsText(r).join("\n");
+    const prazo = M.fmtDateTime(M.expiresAt(r, C));
+    const msgs = {
+      cobranca: `Olá, ${first(r.nome)}! Recebemos sua pré-reserva na Clínica Morada do Ser (código ${r.codigo}).\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor: ${M.money(r.total)}${fixo(r) ? " por mês" : ""}\n${C.pix_chave ? `Para garantir o horário, pague por Pix até ${prazo}:\nChave: ${C.pix_chave}\nRecebedor: ${C.pix_nome || ""}\n` : `Para garantir o horário, o pagamento precisa ser feito até ${prazo}. `}Depois é só mandar o comprovante por aqui.`,
+      confirmada: `Olá, ${first(r.nome)}! Recebemos seu pagamento e sua reserva na Clínica Morada do Ser (código ${r.codigo}) está confirmada.\n${roomName(r.room_id)}\n${resumo}\nQualquer dúvida, é só chamar por aqui.`,
+      recusada: `Olá, ${first(r.nome)}! Infelizmente não conseguimos confirmar sua pré-reserva (código ${r.codigo}) na Clínica Morada do Ser. Podemos ver outro horário para você?`,
+      cancelada: `Olá, ${first(r.nome)}! Sua reserva (código ${r.codigo}) na Clínica Morada do Ser foi cancelada.`,
+      livre: `Olá, ${first(r.nome)}! Aqui é da Clínica Morada do Ser, sobre sua reserva ${r.codigo}.`
+    };
+    return `https://wa.me/${waNum(r.telefone)}?text=${encodeURIComponent(msgs[kind] || msgs.livre)}`;
+  }
+
+  function openRes(id) {
+    const r = all.find(x => x.id === id); if (!r) return;
+    const s = st(r), isB = r.plano === "bloqueio";
+    const pays = (r.payments || []).slice().sort((a, b) => new Date(b.pago_em) - new Date(a.pago_em));
+    const html = `
+      <div class="dr-top">${pill(r)}${isB ? "" : `<span class="tag">${r.user_id ? "Com conta" : "Visitante"}</span><span class="muted small">Código <b>${esc(r.codigo)}</b></span>`}</div>
+      ${isB ? "" : `<section class="dr-sec"><h3>Cliente</h3>
+        <dl class="dl">
+          <dt>Telefone</dt><dd><a href="https://wa.me/${waNum(r.telefone)}" target="_blank" rel="noopener">${esc(r.telefone)}</a></dd>
+          <dt>E-mail</dt><dd>${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : "—"}</dd>
+          <dt>CPF</dt><dd>${r.cpf ? esc(M.cpfFormat(r.cpf)) : "—"}</dd>
+          <dt>Profissão</dt><dd>${esc(r.profissao || "—")}${r.registro ? ` · ${esc(r.registro)}` : ""}</dd>
+        </dl>
+        ${r.cpf || r.email ? `<button type="button" class="linkbtn" data-open-cli="${esc(r.cpf || r.email.toLowerCase())}">Ver histórico do cliente</button>` : ""}</section>`}
+      <section class="dr-sec"><h3>${isB ? "Bloqueio" : "Reserva"}</h3>
+        <dl class="dl">
+          <dt>Sala</dt><dd>${esc(roomName(r.room_id))}</dd>
+          <dt>Plano</dt><dd>${PLANO[r.plano]}</dd>
+          <dt>Horários</dt><dd><ul class="ul">${(slotsText(r).length ? slotsText(r) : ["A combinar"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul></dd>
+          ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${fixo(r) ? " por mês (estimativa)" : ""}</dd>`}
+          <dt>Pedido em</dt><dd>${M.fmtDateTime(new Date(r.created_at))}</dd>
+          ${s === "pendente" ? `<dt>Prazo</dt><dd>Pagar até <b>${M.fmtDateTime(M.expiresAt(r, C))}</b></dd>` : ""}
+          ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
+        </dl>
+        ${s === "expirada" ? `<p class="note">O prazo passou e o horário voltou a ficar livre no site. Dá para confirmar se ninguém tiver reservado o horário.</p>` : ""}</section>
+      ${isB ? "" : `<section class="dr-sec"><h3>Pagamentos</h3>${pays.length ? `<ul class="pays">${pays.map(p => `<li><span>${M.fmtDateTime(new Date(p.pago_em))}<small>${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.forma || "—")}${p.obs ? ` · ${esc(p.obs)}` : ""}</small></span><b>${M.money(p.valor)}</b></li>`).join("")}</ul>` : `<p class="muted small">Nenhum pagamento registrado.</p>`}</section>`}
+      <div class="dr-actions" id="dr-actions">${resActions(r)}</div>
+      <div id="dr-form"></div>`;
+    openDrawer(isB ? r.nome : r.nome, html);
+    $("#dr-actions").onclick = e => onResAction(e, r);
+  }
+
+  function resActions(r) {
+    const s = st(r);
+    if (r.plano === "bloqueio") return r.status === "confirmada" ? `<button type="button" class="btn ghost" data-a="ask-cancel">Remover bloqueio</button>` : "";
+    if (s === "pendente" || s === "expirada") return `
+      <button type="button" class="btn" data-a="pay-confirm">Pagamento recebido</button>
+      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Enviar cobrança</a>
+      <button type="button" class="linkbtn danger-text" data-a="ask-refuse">Recusar</button>`;
+    if (s === "confirmada") return `
+      ${fixo(r) ? `<button type="button" class="btn" data-a="pay-month">Registrar mensalidade</button>` : `<button type="button" class="btn ghost" data-a="pay-extra">Registrar pagamento</button>`}
+      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Mensagem no WhatsApp</a>
+      <button type="button" class="linkbtn danger-text" data-a="ask-cancel">Cancelar reserva</button>`;
+    return `<a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "livre")}">Falar no WhatsApp</a>`;
+  }
+
+  function payForm(r, { withMonth, label }) {
+    const now = new Date();
+    const months = [-1, 0, 1, 2].map(i => new Date(now.getFullYear(), now.getMonth() + i, 1));
+    const paidComps = new Set((r.payments || []).map(p => p.competencia).filter(Boolean));
+    return `<form class="dr-payform" id="payform" novalidate>
+      ${withMonth ? `<div class="field"><label for="pf-comp">Mês de referência</label><select id="pf-comp">${months.map(m => { const v = M.iso(m); return `<option value="${v}" ${paidComps.has(v) ? "disabled" : ""} ${m.getMonth() === now.getMonth() && !paidComps.has(v) ? "selected" : ""}>${MESES[m.getMonth()]} ${m.getFullYear()}${paidComps.has(v) ? " (paga)" : ""}</option>`; }).join("")}</select></div>` : ""}
+      <div class="field"><label for="pf-forma">Forma de pagamento</label><select id="pf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
+      <div class="field"><label for="pf-valor">Valor recebido (R$)</label><input id="pf-valor" type="number" step="0.01" min="0" value="${r.total ?? ""}"></div>
+      <div class="field"><label for="pf-obs">Observação</label><input id="pf-obs" type="text" placeholder="Opcional"></div>
+      <div class="row-actions"><button type="submit" class="btn">${label}</button><button type="button" class="btn ghost" data-a="back">Cancelar</button></div></form>`;
+  }
+
+  async function onResAction(e, r) {
+    const b = e.target.closest("[data-a]"); if (!b) return;
+    const a = b.dataset.a, form = $("#dr-form"), acts = $("#dr-actions");
+    const ask = (txt, yes, lbl) => { acts.innerHTML = `<p class="small">${txt}</p><button type="button" class="btn danger" data-a="${yes}">${lbl}</button><button type="button" class="btn ghost" data-a="back">Voltar</button>`; };
+    if (a === "back") { acts.innerHTML = resActions(r); form.innerHTML = ""; return; }
+    if (a === "ask-refuse") return ask("Recusar esta pré-reserva? Os horários voltam a ficar livres.", "refuse", "Recusar");
+    if (a === "ask-cancel") return ask(r.plano === "bloqueio" ? "Remover este bloqueio?" : "Cancelar esta reserva? Os horários voltam a ficar livres.", "cancel", r.plano === "bloqueio" ? "Remover" : "Cancelar reserva");
+    if (a === "pay-confirm" || a === "pay-month" || a === "pay-extra") {
+      acts.innerHTML = "";
+      form.innerHTML = payForm(r, { withMonth: a === "pay-month", label: a === "pay-confirm" ? "Confirmar reserva" : "Registrar" });
+      form.querySelector("[data-a=back]").onclick = () => { form.innerHTML = ""; acts.innerHTML = resActions(r); };
+      $("#payform").onsubmit = async ev => {
+        ev.preventDefault();
+        const btn = ev.submitter || $("#payform button[type=submit]"); btn.disabled = true;
+        const v = $("#pf-valor").value === "" ? null : Number($("#pf-valor").value);
+        const { error } = a === "pay-confirm"
+          ? await sb.rpc("confirm_reservation", { p_id: r.id, p_forma: $("#pf-forma").value, p_valor: v, p_obs: $("#pf-obs").value })
+          : await sb.rpc("register_payment", { p_res: r.id, p_competencia: a === "pay-month" ? $("#pf-comp").value : null, p_valor: v, p_forma: $("#pf-forma").value, p_obs: $("#pf-obs").value });
+        if (error) { btn.disabled = false; return A().toast(error.message, true); }
+        A().toast(a === "pay-confirm" ? "Reserva confirmada." : "Pagamento registrado.");
+        await reload(); openRes(r.id);
+        if (a === "pay-confirm") { const nr = all.find(x => x.id === r.id); $("#dr-actions").insertAdjacentHTML("afterbegin", `<p class="note ok">Reserva confirmada. <a href="${waLink(nr, "confirmada")}" target="_blank" rel="noopener">Avisar no WhatsApp →</a></p>`); }
+      };
+      return;
+    }
+    if (a === "refuse" || a === "cancel") {
+      b.disabled = true;
+      const status = a === "refuse" ? "recusada" : "cancelada";
+      const { error } = await sb.from("reservations").update({ status, decided_at: new Date().toISOString(), ...(status === "cancelada" ? { cancelado_por: "clinica" } : {}) }).eq("id", r.id);
+      if (error) { b.disabled = false; return A().fail("Erro ao atualizar", error); }
+      A().toast(r.plano === "bloqueio" ? "Bloqueio removido." : `Reserva ${status}.`);
+      await reload();
+      if (r.plano === "bloqueio") return closeDrawer();
+      openRes(r.id);
+      $("#dr-actions").innerHTML = `<p class="note">Avise a pessoa: <a href="${waLink(r, status)}" target="_blank" rel="noopener">enviar mensagem no WhatsApp →</a></p>`;
+    }
+  }
+
+  function openMensalidade(resId, comp) {
+    openRes(resId);
+    const r = all.find(x => x.id === resId);
+    $("#dr-actions").innerHTML = "";
+    $("#dr-form").innerHTML = payForm(r, { withMonth: true, label: "Registrar" });
+    if (comp) $("#pf-comp").value = comp;
+    $("#dr-form [data-a=back]").onclick = () => { $("#dr-form").innerHTML = ""; $("#dr-actions").innerHTML = resActions(r); };
+    $("#payform").onsubmit = async ev => {
+      ev.preventDefault();
+      const { error } = await sb.rpc("register_payment", { p_res: r.id, p_competencia: $("#pf-comp").value, p_valor: $("#pf-valor").value === "" ? null : Number($("#pf-valor").value), p_forma: $("#pf-forma").value, p_obs: $("#pf-obs").value });
+      if (error) return A().toast(error.message, true);
+      A().toast("Mensalidade registrada."); await reload(); openRes(r.id);
+    };
+  }
+
+  function openCliente(key) {
+    const c = clientes().find(x => x.key === key || x.cpf === key || (x.email || "").toLowerCase() === key);
+    if (!c) return;
+    openDrawer(c.nome, `
+      <div class="dr-top">${c.conta ? `<span class="tag">Com conta</span>` : `<span class="tag">Visitante</span>`}</div>
+      <section class="dr-sec"><h3>Contato</h3><dl class="dl">
+        <dt>Telefone</dt><dd><a href="https://wa.me/${waNum(c.telefone)}" target="_blank" rel="noopener">${esc(c.telefone)}</a></dd>
+        <dt>E-mail</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"}</dd>
+        <dt>CPF</dt><dd>${c.cpf ? esc(M.cpfFormat(c.cpf)) : "—"}</dd></dl></section>
+      <section class="dr-sec"><h3>Resumo</h3><div class="mini-kpis"><div><strong>${c.res.length}</strong><small>reservas</small></div><div><strong>${c.res.filter(r => r.status === "confirmada").length}</strong><small>confirmadas</small></div><div><strong>${M.money(c.pago)}</strong><small>pago no total</small></div></div></section>
+      <section class="dr-sec"><h3>Reservas</h3><ul class="cli-res">${c.res.map(r => `<li><button type="button" class="linkrow" data-open-res="${r.id}"><span><b>${esc(roomName(r.room_id))}</b> · ${PLANO[r.plano]}<small>${esc(slotsText(r)[0] || "")}</small></span>${pill(r)}</button></li>`).join("")}</ul></section>
+      <div class="dr-actions"><a class="btn ghost" href="https://wa.me/${waNum(c.telefone)}" target="_blank" rel="noopener">Falar no WhatsApp</a></div>`);
+  }
+
+  // nova reserva / bloqueio a partir da agenda
+  function openNew(roomId, date, h) {
+    const d = M.parse(date), o = openOf(d) || [h, h + 1];
+    const hopt = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i).map(x => `<option value="${x}" ${x === sel ? "selected" : ""}>${x}h</option>`).join("");
+    openDrawer("Novo horário", `
+      <div class="seg-a" role="tablist"><button type="button" data-k="res" aria-pressed="true">Reserva de cliente</button><button type="button" data-k="blk" aria-pressed="false">Bloquear (uso da clínica)</button></div>
+      <form id="nf" class="dr-payform" novalidate>
+        <div class="grid-f">
+          <div class="field"><label for="nf-sala">Sala</label><select id="nf-sala">${rooms.map(r => `<option value="${r.id}" ${r.id === roomId ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+          <div class="field"><label for="nf-data">Data</label><input id="nf-data" type="date" value="${date}"></div>
+          <div class="field"><label for="nf-ini">Das</label><select id="nf-ini">${hopt(h, o[0], o[1] - 1)}</select></div>
+          <div class="field"><label for="nf-fim">Até</label><select id="nf-fim">${hopt(h + 1, o[0] + 1, o[1])}</select></div>
+          <div class="field wide"><label for="nf-freq">Repetir</label><select id="nf-freq"><option value="unica">Não repetir</option><option value="semanal">Toda semana</option><option value="quinzenal">A cada 15 dias</option></select></div>
+        </div>
+        <div id="nf-res" class="grid-f">
+          <div class="field wide"><label for="nf-nome">Nome do cliente</label><input id="nf-nome" type="text" required></div>
+          <div class="field"><label for="nf-tel">Telefone</label><input id="nf-tel" type="tel"></div>
+          <div class="field"><label for="nf-cpf">CPF</label><input id="nf-cpf" type="text" inputmode="numeric" data-cpf></div>
+          <div class="field wide"><label for="nf-email">E-mail</label><input id="nf-email" type="email"></div>
+          <div class="field"><label for="nf-plano">Plano</label><select id="nf-plano"><option value="avulso">Hora avulsa</option><option value="periodo">Período</option><option value="pacote">Pacote</option><option value="semanal">Fixo semanal</option><option value="quinzenal">Fixo quinzenal</option></select></div>
+          <div class="field"><label for="nf-valor">Valor (R$)</label><input id="nf-valor" type="number" step="0.01" min="0"></div>
+          <div class="field wide"><label for="nf-status">Pagamento</label><select id="nf-status"><option value="pendente">Ainda não pagou (aguardando pagamento)</option><option value="confirmada">Já pagou (confirmar agora)</option></select></div>
+          <div class="field wide" id="nf-forma-w" hidden><label for="nf-forma">Forma de pagamento</label><select id="nf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
+        </div>
+        <div id="nf-blk" hidden><div class="field"><label for="nf-motivo">Motivo</label><input id="nf-motivo" type="text" placeholder="Ex.: atendimento da clínica"></div></div>
+        <p class="err" id="nf-err" hidden></p>
+        <div class="row-actions"><button type="submit" class="btn" id="nf-save">Salvar reserva</button><button type="button" class="btn ghost" data-close>Cancelar</button></div>
+      </form>`);
+    let kind = "res";
+    const f = s => $("#nf-" + s);
+    const sync = () => {
+      const hrs = Math.max(0, +f("fim").value - +f("ini").value), plano = f("plano").value;
+      if (kind === "res" && !f("valor").dataset.touched) {
+        const rate = plano === "semanal" ? M.semanalRate(C, hrs) : plano === "quinzenal" ? C.preco_quinzenal : plano === "periodo" ? C.preco_periodo : C.preco_avulso;
+        f("valor").value = plano === "pacote" ? C.pacote_preco : (hrs * rate * (plano === "semanal" ? 4 : plano === "quinzenal" ? 2 : 1)).toFixed(2);
+      }
+      if ((plano === "semanal" || plano === "quinzenal") && f("freq").value === "unica") f("freq").value = plano;
+      f("forma-w").hidden = f("status").value !== "confirmada";
+    };
+    ["ini", "fim", "plano", "status", "freq"].forEach(k => f(k).addEventListener("change", sync));
+    f("valor").addEventListener("input", () => f("valor").dataset.touched = "1");
+    sync();
+    $$("#dr-body .seg-a button").forEach(b => b.onclick = () => {
+      kind = b.dataset.k; $$("#dr-body .seg-a button").forEach(x => x.setAttribute("aria-pressed", x === b));
+      f("res").hidden = kind !== "res"; f("blk").hidden = kind !== "blk"; f("save").textContent = kind === "res" ? "Salvar reserva" : "Salvar bloqueio";
+    });
+    $("#nf").onsubmit = async ev => {
+      ev.preventDefault();
+      const err = m => { f("err").textContent = m; f("err").hidden = !m; };
+      const slot = { freq: f("freq").value, data: f("data").value, hora_ini: +f("ini").value, hora_fim: +f("fim").value };
+      if (!(slot.hora_fim > slot.hora_ini)) return err("O horário final precisa ser depois do inicial.");
+      const room = f("sala").value, btn = f("save"); btn.disabled = true;
+      if (kind === "blk") {
+        const nome = f("motivo").value.trim() || "Uso da clínica";
+        const { data: res, error } = await sb.from("reservations").insert({ room_id: room, plano: "bloqueio", status: "confirmada", nome, resumo: fmtSlot(slot) }).select("id").single();
+        if (error) { btn.disabled = false; return err(error.message); }
+        const { error: e2 } = await sb.from("reservation_slots").insert({ ...slot, reservation_id: res.id, room_id: room });
+        if (e2) { await sb.from("reservations").delete().eq("id", res.id); btn.disabled = false; return err(e2.message); }
+        A().toast("Horário bloqueado.");
+      } else {
+        const nome = f("nome").value.trim(), cpf = M.onlyDigits(f("cpf").value);
+        if (!nome) { btn.disabled = false; return err("Preencha o nome do cliente."); }
+        if (cpf && !M.cpfValid(cpf)) { btn.disabled = false; return err("CPF inválido."); }
+        const plano = f("plano").value;
+        const { error } = await sb.rpc("staff_create_reservation", { p: {
+          room_id: room, plano, status: f("status").value, nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
+          total: f("valor").value, forma: f("forma").value, resumo: `Plano: ${PLANO[plano]}\n${fmtSlot(slot)}`, slots: [slot] } });
+        if (error) { btn.disabled = false; return err(error.message); }
+        A().toast("Reserva criada.");
+      }
+      closeDrawer(); await reload();
+    };
+  }
+
+  // ================= EQUIPE =================
+  async function renderStaff() {
+    const { data, error } = await sb.from("staff").select("user_id,email,created_at").order("created_at");
+    if (error) return;
+    const me = (await M.getUser())?.id;
+    $("#staff-list").innerHTML = data.map(s => `<li><span>${esc(s.email)}${s.user_id === me ? ' <span class="muted small">(você)</span>' : ""}</span>
+      ${s.user_id === me ? "" : `<button type="button" class="linkbtn danger-text" data-rm="${s.user_id}">Remover acesso</button>`}</li>`).join("");
+  }
+  async function addStaff(e) {
+    e.preventDefault();
+    const { error } = await sb.rpc("add_staff", { p_email: $("#st-email").value });
+    if (error) return A().toast(error.message, true);
+    $("#st-email").value = ""; A().toast("Acesso liberado."); renderStaff();
+  }
+  async function removeStaff(e) {
+    const b = e.target.closest("[data-rm]"); if (!b) return;
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Clique de novo para remover"; return; }
+    const { error } = await sb.rpc("remove_staff", { p_user: b.dataset.rm });
+    if (error) return A().toast(error.message, true);
+    A().toast("Acesso removido."); renderStaff();
+  }
+
+  // atualiza sozinho a cada 2 minutos (novas pré-reservas)
+  setInterval(() => { if (bound && document.visibilityState === "visible" && $("#drawer").hidden) reload(); }, 120000);
+})();

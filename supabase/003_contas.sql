@@ -349,3 +349,19 @@ grant execute on function public.claim_my_reservations() to authenticated;
 grant execute on function public.cpf_valido(text) to anon, authenticated;
 grant execute on function public.confirm_reservation(uuid, text, numeric, text) to authenticated;
 grant execute on function public.prazo_pagamento_horas() to anon, authenticated;
+
+-- No Supabase, anon/authenticated recebem execute direto em funções novas: tira das internas
+revoke all on function public.occupied_slots_ex(uuid, date, date, uuid) from anon, authenticated;
+revoke all on function public.has_conflict(uuid, text, date, int, int, uuid) from anon, authenticated;
+revoke all on function public.handle_new_user() from anon, authenticated;
+revoke all on function public.add_staff(text) from anon;
+revoke all on function public.remove_staff(uuid) from anon;
+revoke all on function public.confirm_reservation(uuid, text, numeric, text) from anon;
+revoke all on function public.cancel_my_reservation(uuid) from anon;
+revoke all on function public.claim_reservation(text, text) from anon;
+revoke all on function public.claim_my_reservations() from anon;
+
+-- Perfis para contas que já existiam antes desta migração
+insert into public.profiles (id, email)
+select id, coalesce(email, '') from auth.users
+on conflict (id) do nothing;
