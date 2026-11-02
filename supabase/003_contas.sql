@@ -46,6 +46,20 @@ begin
   delete from public.staff where user_id = p_user;
 end $$;
 
+-- ========== CPF ==========
+create or replace function public.cpf_valido(p text) returns boolean
+language plpgsql immutable set search_path = public as $$
+declare d text := regexp_replace(coalesce(p, ''), '\D', '', 'g'); s int; r int; i int;
+begin
+  if length(d) <> 11 or d ~ '^(\d)\1{10}$' then return false; end if;
+  s := 0; for i in 1..9 loop s := s + substr(d, i, 1)::int * (11 - i); end loop;
+  r := (s * 10) % 11; if r = 10 then r := 0; end if;
+  if r <> substr(d, 10, 1)::int then return false; end if;
+  s := 0; for i in 1..10 loop s := s + substr(d, i, 1)::int * (12 - i); end loop;
+  r := (s * 10) % 11; if r = 10 then r := 0; end if;
+  return r = substr(d, 11, 1)::int;
+end $$;
+
 -- ========== Perfis de clientes ==========
 create table if not exists public.profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
@@ -54,9 +68,11 @@ create table if not exists public.profiles (
   email      text not null default '',
   profissao  text not null default '',
   registro   text not null default '',
+  cpf        text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create unique index if not exists profiles_cpf_idx on public.profiles(cpf) where cpf <> '';
 alter table public.profiles enable row level security;
 create policy "cliente vê o seu"     on public.profiles for select to authenticated using (id = auth.uid() or public.is_staff());
 create policy "cliente cria o seu"   on public.profiles for insert to authenticated with check (id = auth.uid());
@@ -65,12 +81,15 @@ create policy "cliente edita o seu"  on public.profiles for update to authentica
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, email, nome, telefone, profissao, registro)
+  insert into public.profiles (id, email, nome, telefone, profissao, registro, cpf)
   values (new.id, coalesce(new.email, ''),
           left(coalesce(new.raw_user_meta_data->>'nome', ''), 120),
           left(coalesce(new.raw_user_meta_data->>'telefone', ''), 30),
           left(coalesce(new.raw_user_meta_data->>'profissao', ''), 80),
-          left(coalesce(new.raw_user_meta_data->>'registro', ''), 40))
+          left(coalesce(new.raw_user_meta_data->>'registro', ''), 40),
+          case when public.cpf_valido(new.raw_user_meta_data->>'cpf')
+                and not exists (select 1 from public.profiles where cpf = regexp_replace(new.raw_user_meta_data->>'cpf', '\D', '', 'g'))
+               then regexp_replace(new.raw_user_meta_data->>'cpf', '\D', '', 'g') else '' end)
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -86,7 +105,9 @@ alter table public.reservations
   add column if not exists pago_em         timestamptz,
   add column if not exists pagamento_obs   text not null default '',
   add column if not exists aceite_em       timestamptz,
-  add column if not exists cancelado_por   text;
+  add column if not exists cancelado_por   text,
+  add column if not exists cpf             text not null default '';
+create index if not exists reservations_cpf_idx on public.reservations(cpf) where cpf <> '';
 update public.reservations set codigo = upper(substr(replace(id::text, '-', ''), 1, 8)) where codigo is null;
 alter table public.reservations alter column codigo set default upper(substr(md5(gen_random_uuid()::text), 1, 8));
 alter table public.reservations alter column codigo set not null;
@@ -157,8 +178,14 @@ begin
   if not exists (select 1 from public.rooms where id = v_room and active) then
     raise exception 'Esta sala não está disponível para reserva.';
   end if;
-  if coalesce(trim(p->>'nome'), '') = '' or length(regexp_replace(coalesce(p->>'telefone', ''), '\D', '', 'g')) < 10 then
-    raise exception 'Informe seu nome e um WhatsApp com DDD.';
+  if array_length(regexp_split_to_array(trim(coalesce(p->>'nome', '')), '\s+'), 1) < 2 then
+    raise exception 'Informe seu nome completo.';
+  end if;
+  if length(regexp_replace(coalesce(p->>'telefone', ''), '\D', '', 'g')) < 10 then
+    raise exception 'Informe um telefone de contato com DDD.';
+  end if;
+  if not public.cpf_valido(p->>'cpf') then
+    raise exception 'CPF inválido. Confira os números.';
   end if;
   if coalesce(p->>'plano', '') not in ('avulso','pacote','periodo','semanal','quinzenal') then
     raise exception 'Plano inválido.';
@@ -167,10 +194,14 @@ begin
     raise exception 'Para reservar, é preciso aceitar as regras de uso.';
   end if;
   v_email := left(coalesce(p->>'email', ''), 120);
-  if v_uid is not null then select coalesce(nullif(v_email, ''), email) into v_email from auth.users where id = v_uid; end if;
+  if v_uid is not null then select email into v_email from auth.users where id = v_uid; end if;
+  if coalesce(v_email, '') !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'Informe um e-mail válido.';
+  end if;
 
-  insert into public.reservations (room_id, user_id, plano, nome, telefone, email, profissao, registro, obs, total, resumo, aceite_em)
+  insert into public.reservations (room_id, user_id, plano, nome, telefone, email, cpf, profissao, registro, obs, total, resumo, aceite_em)
   values (v_room, v_uid, p->>'plano', left(trim(p->>'nome'), 120), left(p->>'telefone', 30), coalesce(v_email, ''),
+          regexp_replace(p->>'cpf', '\D', '', 'g'),
           left(coalesce(p->>'profissao', ''), 80), left(coalesce(p->>'registro', ''), 40), left(coalesce(p->>'obs', ''), 1000),
           nullif(p->>'total', '')::numeric, left(coalesce(p->>'resumo', ''), 3000), now())
   returning id, codigo into rid, cod;
@@ -196,6 +227,8 @@ begin
       telefone = case when telefone = '' then left(p->>'telefone', 30) else telefone end,
       profissao = case when profissao = '' then left(coalesce(p->>'profissao', ''), 80) else profissao end,
       registro = case when registro = '' then left(coalesce(p->>'registro', ''), 40) else registro end,
+      cpf = case when cpf = '' and not exists (select 1 from public.profiles x where x.cpf = regexp_replace(p->>'cpf', '\D', '', 'g'))
+                 then regexp_replace(p->>'cpf', '\D', '', 'g') else cpf end,
       updated_at = now()
     where id = v_uid;
   end if;
@@ -228,8 +261,9 @@ language sql stable security definer set search_path = public as $$
     'expira_em', r.created_at + make_interval(hours => public.prazo_pagamento_horas()))
   from public.reservations r join public.rooms ro on ro.id = r.room_id
   where r.codigo = upper(trim(p_codigo)) and r.plano <> 'bloqueio'
-    and right(regexp_replace(r.telefone, '\D', '', 'g'), 8) = right(regexp_replace(p_telefone, '\D', '', 'g'), 8)
     and length(regexp_replace(p_telefone, '\D', '', 'g')) >= 8
+    and (right(regexp_replace(r.telefone, '\D', '', 'g'), 8) = right(regexp_replace(p_telefone, '\D', '', 'g'), 8)
+         or (r.cpf <> '' and r.cpf = regexp_replace(p_telefone, '\D', '', 'g')))
 $$;
 
 -- Cliente logado vincula uma reserva feita como visitante (código + WhatsApp)
@@ -240,20 +274,31 @@ begin
   if auth.uid() is null then raise exception 'Entre na sua conta primeiro.'; end if;
   select id into v_id from public.reservations
   where codigo = upper(trim(p_codigo)) and user_id is null and plano <> 'bloqueio'
-    and right(regexp_replace(telefone, '\D', '', 'g'), 8) = right(regexp_replace(p_telefone, '\D', '', 'g'), 8);
+    and length(regexp_replace(p_telefone, '\D', '', 'g')) >= 8
+    and (right(regexp_replace(telefone, '\D', '', 'g'), 8) = right(regexp_replace(p_telefone, '\D', '', 'g'), 8)
+         or (cpf <> '' and cpf = regexp_replace(p_telefone, '\D', '', 'g')));
   if v_id is null then raise exception 'Não encontramos uma reserva sem conta com esse código e WhatsApp.'; end if;
   update public.reservations set user_id = auth.uid() where id = v_id;
 end $$;
 
--- Vincula automaticamente reservas de visitante feitas com o mesmo e-mail (só e-mail confirmado)
-create or replace function public.claim_by_email() returns int
+-- Vincula automaticamente reservas de visitante à conta:
+--  · pelo e-mail, quando o e-mail da conta está confirmado; ou
+--  · pelo CPF do perfil, desde que o telefone (últimos 8 dígitos) também bata.
+create or replace function public.claim_my_reservations() returns int
 language plpgsql security definer set search_path = public as $$
-declare v_email text; n int;
+declare v_email text; v_cpf text; v_tel text; n int;
 begin
-  select email into v_email from auth.users where id = auth.uid() and email_confirmed_at is not null;
-  if v_email is null then return 0; end if;
-  update public.reservations set user_id = auth.uid()
-  where user_id is null and plano <> 'bloqueio' and lower(email) = lower(v_email);
+  if auth.uid() is null then return 0; end if;
+  select u.email, p.cpf, right(regexp_replace(p.telefone, '\D', '', 'g'), 8)
+    into v_email, v_cpf, v_tel
+  from auth.users u left join public.profiles p on p.id = u.id
+  where u.id = auth.uid();
+  update public.reservations r set user_id = auth.uid()
+  where r.user_id is null and r.plano <> 'bloqueio'
+    and ( (v_email is not null and lower(r.email) = lower(v_email)
+           and exists (select 1 from auth.users where id = auth.uid() and email_confirmed_at is not null))
+       or (coalesce(v_cpf, '') <> '' and r.cpf = v_cpf and length(coalesce(v_tel, '')) = 8
+           and right(regexp_replace(r.telefone, '\D', '', 'g'), 8) = v_tel) );
   get diagnostics n = row_count;
   return n;
 end $$;
@@ -288,7 +333,7 @@ revoke all on function public.request_reservation(jsonb) from public;
 revoke all on function public.cancel_my_reservation(uuid) from public;
 revoke all on function public.reservation_by_code(text, text) from public;
 revoke all on function public.claim_reservation(text, text) from public;
-revoke all on function public.claim_by_email() from public;
+revoke all on function public.claim_my_reservations() from public;
 revoke all on function public.confirm_reservation(uuid, text, numeric, text) from public;
 revoke all on function public.prazo_pagamento_horas() from public;
 revoke all on function public.handle_new_user() from public;
@@ -300,6 +345,7 @@ grant execute on function public.request_reservation(jsonb) to anon, authenticat
 grant execute on function public.cancel_my_reservation(uuid) to authenticated;
 grant execute on function public.reservation_by_code(text, text) to anon, authenticated;
 grant execute on function public.claim_reservation(text, text) to authenticated;
-grant execute on function public.claim_by_email() to authenticated;
+grant execute on function public.claim_my_reservations() to authenticated;
+grant execute on function public.cpf_valido(text) to anon, authenticated;
 grant execute on function public.confirm_reservation(uuid, text, numeric, text) to authenticated;
 grant execute on function public.prazo_pagamento_horas() to anon, authenticated;

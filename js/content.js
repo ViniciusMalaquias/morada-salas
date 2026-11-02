@@ -201,6 +201,20 @@
     return out;
   }
 
+  // ---------- CPF ----------
+  const onlyDigits = v => String(v || "").replace(/\D/g, "");
+  function cpfValid(v) {
+    const d = onlyDigits(v);
+    if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+    const calc = n => { let s = 0; for (let i = 0; i < n; i++) s += +d[i] * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+    return calc(9) === +d[9] && calc(10) === +d[10];
+  }
+  const cpfFormat = v => onlyDigits(v).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  const fullName = v => String(v || "").trim().split(/\s+/).length >= 2;
+  const emailValid = v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v || "").trim());
+  // máscara automática em qualquer input[data-cpf]
+  document.addEventListener("input", e => { if (e.target.matches?.("input[data-cpf]")) e.target.value = cpfFormat(e.target.value); });
+
   // ---------- contas ----------
   async function getUser() {
     if (!client) return null;
@@ -235,6 +249,7 @@
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
     money, pct, plans, semanalRate, ranges, iso, parse, addDays, monday, br, pad,
+    cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };
 })();

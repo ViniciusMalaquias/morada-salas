@@ -90,6 +90,7 @@
         ${isBloq ? "" : `<dl class="res-dl">
           <dt>WhatsApp</dt><dd><a href="https://wa.me/${waNumber(r.telefone)}" target="_blank" rel="noopener">${esc(r.telefone)}</a></dd>
           ${r.email ? `<dt>E-mail</dt><dd>${esc(r.email)}</dd>` : ""}
+          ${r.cpf ? `<dt>CPF</dt><dd>${esc(M.cpfFormat(r.cpf))}</dd>` : ""}
           <dt>Profissão</dt><dd>${esc(r.profissao || "—")}${r.registro ? ` · ${esc(r.registro)}` : ""}</dd>
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>`}

@@ -52,14 +52,15 @@
   });
   $("#f-signup").addEventListener("submit", async e => {
     e.preventDefault(); err("#s-err", "");
-    const nome = $("#s-nome").value.trim(), telefone = $("#s-tel").value.trim(), email = $("#s-email").value.trim(), pass = $("#s-pass").value;
-    if (!nome) return err("#s-err", "Preencha seu nome.");
-    if (telefone.replace(/\D/g, "").length < 10) return err("#s-err", "Preencha seu WhatsApp com DDD.");
-    if (!/^\S+@\S+\.\S+$/.test(email)) return err("#s-err", "Confira o e-mail.");
+    const nome = $("#s-nome").value.trim(), telefone = $("#s-tel").value.trim(), email = $("#s-email").value.trim(), pass = $("#s-pass").value, cpf = M.onlyDigits($("#s-cpf").value);
+    if (!M.fullName(nome)) return err("#s-err", "Preencha seu nome completo.");
+    if (!M.cpfValid(cpf)) return err("#s-err", "CPF inválido. Confira os números.");
+    if (telefone.replace(/\D/g, "").length < 10) return err("#s-err", "Preencha o telefone de contato com DDD.");
+    if (!M.emailValid(email)) return err("#s-err", "Confira o e-mail.");
     if (pass.length < 8) return err("#s-err", "A senha precisa ter pelo menos 8 caracteres.");
     const { data, error } = await sb.auth.signUp({ email, password: pass, options: {
       emailRedirectTo: location.href.split("#")[0],
-      data: { nome, telefone, profissao: $("#s-prof").value, registro: $("#s-reg").value.trim() } } });
+      data: { nome, telefone, cpf, profissao: $("#s-prof").value, registro: $("#s-reg").value.trim() } } });
     if (error) return err("#s-err", /registered|exists/i.test(error.message) ? "Já existe uma conta com esse e-mail. Use a aba Entrar." : error.message);
     if (!data.session) {
       $("#f-signup").hidden = true;
@@ -96,10 +97,11 @@
     const p = prof || {};
     $("#hello").textContent = p.nome ? `Olá, ${p.nome.split(" ")[0]}!` : "Olá!";
     $("#to-admin").hidden = !staff;
+    $("#p-cpf").value = M.cpfFormat(p.cpf || "");
     $("#p-nome").value = p.nome || ""; $("#p-tel").value = p.telefone || ""; $("#p-reg").value = p.registro || ""; $("#p-email").value = user.email || "";
     if (p.profissao) $("#p-prof").value = p.profissao;
-    const { data: n } = await sb.rpc("claim_by_email");
-    if (n > 0) toast(`${n} reserva${n > 1 ? "s" : ""} feita${n > 1 ? "s" : ""} com seu e-mail foi vinculada${n > 1 ? "s" : ""} à sua conta.`);
+    const { data: n } = await sb.rpc("claim_my_reservations");
+    if (n > 0) toast(`${n > 1 ? `${n} reservas feitas` : "1 reserva feita"} antes do cadastro ${n > 1 ? "foram vinculadas" : "foi vinculada"} à sua conta.`);
     loadMine(user.id);
   }
   $("#logout").addEventListener("click", () => sb.auth.signOut());
@@ -189,11 +191,14 @@
   $("#f-perfil").addEventListener("submit", async e => {
     e.preventDefault();
     const u = await M.getUser();
-    const row = { id: u.id, email: u.email, nome: $("#p-nome").value.trim(), telefone: $("#p-tel").value.trim(), profissao: $("#p-prof").value, registro: $("#p-reg").value.trim(), updated_at: new Date().toISOString() };
-    if (!row.nome) return toast("Preencha seu nome.", true);
-    if (row.telefone.replace(/\D/g, "").length < 10) return toast("Preencha seu WhatsApp com DDD.", true);
+    const row = { id: u.id, email: u.email, nome: $("#p-nome").value.trim(), cpf: M.onlyDigits($("#p-cpf").value), telefone: $("#p-tel").value.trim(), profissao: $("#p-prof").value, registro: $("#p-reg").value.trim(), updated_at: new Date().toISOString() };
+    if (!M.fullName(row.nome)) return toast("Preencha seu nome completo.", true);
+    if (!M.cpfValid(row.cpf)) return toast("CPF inválido. Confira os números.", true);
+    if (row.telefone.replace(/\D/g, "").length < 10) return toast("Preencha o telefone de contato com DDD.", true);
     const { error } = await sb.from("profiles").upsert(row);
-    if (error) return toast("Não foi possível salvar. Tente de novo.", true);
+    if (error) return toast(/profiles_cpf_idx|duplicate/.test(error.message) ? "Este CPF já está em outra conta. Fale com a clínica." : "Não foi possível salvar. Tente de novo.", true);
+    const { data: n } = await sb.rpc("claim_my_reservations");
+    if (n > 0) loadMine(u.id);
     $("#hello").textContent = `Olá, ${row.nome.split(" ")[0]}!`; toast("Dados salvos.");
   });
 })();

@@ -251,7 +251,6 @@
     $("#login-box").hidden = m !== "login";
     $("#f-res").hidden = m === "login";
     $("#pass-wrap").hidden = m !== "signup";
-    $("#f-email-label").textContent = m === "signup" ? "E-mail" : "E-mail (opcional)";
   }
   document.querySelectorAll("#auth-pick .seg button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
 
@@ -265,6 +264,7 @@
     if (p?.telefone) $("#f-tel").value = p.telefone;
     if (p?.profissao) $("#f-prof").value = p.profissao;
     if (p?.registro) $("#f-reg").value = p.registro;
+    if (p?.cpf) $("#f-cpf").value = M.cpfFormat(p.cpf);
     $("#f-email").value = u.email; $("#f-email").disabled = true;
   }
   if (sb) useUser(await M.getUser());
@@ -278,12 +278,13 @@
 
   $("#btn-send").addEventListener("click", async () => {
     const r = compute(); if (!r) return;
-    const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim(), email = $("#f-email").value.trim();
+    const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim(), email = $("#f-email").value.trim(), cpf = M.onlyDigits($("#f-cpf").value);
     if (!r.slots.length && plan !== "pacote") return showErr("Escolha pelo menos um horário.");
     if (authMode === "login") return showErr("Entre na sua conta ou escolha Continuar como visitante.");
-    if (!nome) { $("#f-nome").focus(); return showErr("Preencha seu nome no passo 3."); }
-    if (tel.replace(/\D/g, "").length < 10) { $("#f-tel").focus(); return showErr("Preencha seu WhatsApp com DDD no passo 3."); }
-    if (authMode === "signup" && !/^\S+@\S+\.\S+$/.test(email)) { $("#f-email").focus(); return showErr("Preencha seu e-mail para criar a conta."); }
+    if (!M.fullName(nome)) { $("#f-nome").focus(); return showErr("Preencha seu nome completo no passo 3."); }
+    if (!M.emailValid(email)) { $("#f-email").focus(); return showErr("Preencha um e-mail válido no passo 3."); }
+    if (!M.cpfValid(cpf)) { $("#f-cpf").focus(); return showErr("CPF inválido. Confira os números no passo 3."); }
+    if (tel.replace(/\D/g, "").length < 10) { $("#f-tel").focus(); return showErr("Preencha o telefone de contato com DDD no passo 3."); }
     if (authMode === "signup" && $("#f-pass").value.length < 8) { $("#f-pass").focus(); return showErr("A senha precisa ter pelo menos 8 caracteres."); }
     if (!$("#f-aceite").checked) { $("#f-aceite").focus(); return showErr("Para reservar, marque que você aceita as regras de uso."); }
     if (!sb) return showErr("O site está em modo demonstração e não recebe reservas.");
@@ -295,14 +296,14 @@
     if (authMode === "signup") {
       const { data, error } = await sb.auth.signUp({ email, password: $("#f-pass").value, options: {
         emailRedirectTo: new URL("conta.html", location.href).href,
-        data: { nome, telefone: tel, profissao: $("#f-prof").value, registro: $("#f-reg").value.trim() } } });
+        data: { nome, telefone: tel, cpf, profissao: $("#f-prof").value, registro: $("#f-reg").value.trim() } } });
       if (error) { reset(); return showErr(/registered|exists/i.test(error.message) ? "Já existe uma conta com esse e-mail. Use a opção Entrar." : `Não foi possível criar a conta: ${error.message}`); }
       if (data.session) user = data.user; else pendingConfirm = true;
     }
 
     const resumo = [`Plano: ${r.planName}`, ...r.lines, `${r.totalLabel}: ${M.money(r.total)}`].join("\n");
     const { data, error } = await sb.rpc("request_reservation", { p: {
-      room_id: room.id, plano: plan, nome, telefone: tel, email,
+      room_id: room.id, plano: plan, nome, telefone: tel, email, cpf,
       profissao: $("#f-prof").value, registro: $("#f-reg").value.trim(), obs: $("#f-obs").value.trim(),
       total: Math.round(r.total * 100) / 100, resumo, slots: r.slots, aceite: "true"
     }});

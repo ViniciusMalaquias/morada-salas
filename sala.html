@@ -88,8 +88,9 @@
             </div>
             <form id="f-res" class="form-grid" novalidate>
               <div class="field"><label for="f-nome">Nome completo</label><input id="f-nome" type="text" autocomplete="name" required></div>
-              <div class="field"><label for="f-tel">WhatsApp com DDD</label><input id="f-tel" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 90000-0000" required></div>
-              <div class="field"><label for="f-email" id="f-email-label">E-mail (opcional)</label><input id="f-email" type="email" autocomplete="email"></div>
+              <div class="field"><label for="f-tel">Telefone de contato (WhatsApp)</label><input id="f-tel" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 90000-0000" required></div>
+              <div class="field"><label for="f-email">E-mail</label><input id="f-email" type="email" autocomplete="email" required></div>
+              <div class="field"><label for="f-cpf">CPF</label><input id="f-cpf" type="text" inputmode="numeric" data-cpf placeholder="000.000.000-00" required></div>
               <div class="field" id="pass-wrap" hidden><label for="f-pass">Crie uma senha (mínimo 8 caracteres)</label><input id="f-pass" type="password" autocomplete="new-password" minlength="8"></div>
               <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
               <div class="field"><label for="f-reg">Registro profissional (opcional)</label><input id="f-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>

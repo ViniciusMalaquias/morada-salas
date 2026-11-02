@@ -47,7 +47,8 @@
 
         <form id="f-signup" class="stack" novalidate hidden>
           <div class="field"><label for="s-nome">Nome completo</label><input id="s-nome" type="text" autocomplete="name" required></div>
-          <div class="field"><label for="s-tel">WhatsApp com DDD</label><input id="s-tel" type="tel" autocomplete="tel" placeholder="(11) 90000-0000" required></div>
+          <div class="field"><label for="s-cpf">CPF</label><input id="s-cpf" type="text" inputmode="numeric" data-cpf placeholder="000.000.000-00" required></div>
+          <div class="field"><label for="s-tel">Telefone de contato (WhatsApp)</label><input id="s-tel" type="tel" autocomplete="tel" placeholder="(11) 90000-0000" required></div>
           <div class="field"><label for="s-prof">Profissão</label><select id="s-prof"></select></div>
           <div class="field"><label for="s-reg">Registro profissional (opcional)</label><input id="s-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
           <div class="field"><label for="s-email">E-mail</label><input id="s-email" type="email" autocomplete="email" required></div>
@@ -60,10 +61,10 @@
 
       <div class="card acc-card">
         <h2 class="h3">Reservou sem conta?</h2>
-        <p class="muted">Consulte o andamento com o código da reserva e o WhatsApp que você informou.</p>
+        <p class="muted">Consulte o andamento com o código da reserva e o telefone ou CPF que você informou.</p>
         <form id="f-code" class="stack" novalidate>
           <div class="field"><label for="c-code">Código da reserva</label><input id="c-code" type="text" autocapitalize="characters" placeholder="Ex.: 3F9A1C2B" required></div>
-          <div class="field"><label for="c-tel">WhatsApp</label><input id="c-tel" type="tel" placeholder="(11) 90000-0000" required></div>
+          <div class="field"><label for="c-tel">Telefone ou CPF</label><input id="c-tel" type="text" inputmode="numeric" required></div>
           <p class="err" id="c-err" hidden></p>
           <button class="btn ghost" type="submit">Consultar</button>
         </form>
@@ -106,10 +107,11 @@
     <div id="p-res">
       <div id="my-list" class="my-list"><p class="muted">Carregando…</p></div>
       <details class="card claim">
-        <summary>Fez uma reserva antes de criar a conta? Vincule aqui</summary>
+        <summary>Não encontrou uma reserva feita antes de criar a conta? Vincule aqui</summary>
+        <p class="muted small">Reservas com o mesmo e-mail, ou com o mesmo CPF e telefone da sua conta, aparecem sozinhas.</p>
         <form id="f-claim" class="claim-form" novalidate>
           <div class="field"><label for="k-code">Código da reserva</label><input id="k-code" type="text" autocapitalize="characters" required></div>
-          <div class="field"><label for="k-tel">WhatsApp usado na reserva</label><input id="k-tel" type="tel" required></div>
+          <div class="field"><label for="k-tel">Telefone ou CPF usado na reserva</label><input id="k-tel" type="text" inputmode="numeric" required></div>
           <button class="btn ghost" type="submit">Vincular</button>
         </form>
         <p class="err" id="k-err" hidden></p>
@@ -119,7 +121,8 @@
     <div id="p-dados" hidden>
       <form id="f-perfil" class="card stack narrow" novalidate>
         <div class="field"><label for="p-nome">Nome completo</label><input id="p-nome" type="text" autocomplete="name"></div>
-        <div class="field"><label for="p-tel">WhatsApp com DDD</label><input id="p-tel" type="tel" autocomplete="tel"></div>
+        <div class="field"><label for="p-cpf">CPF</label><input id="p-cpf" type="text" inputmode="numeric" data-cpf></div>
+        <div class="field"><label for="p-tel">Telefone de contato (WhatsApp)</label><input id="p-tel" type="tel" autocomplete="tel"></div>
         <div class="field"><label for="p-prof">Profissão</label><select id="p-prof"></select></div>
         <div class="field"><label for="p-reg">Registro profissional</label><input id="p-reg" type="text"></div>
         <div class="field"><label for="p-email">E-mail</label><input id="p-email" type="email" disabled></div>
