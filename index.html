@@ -22,6 +22,7 @@
     </a>
     <nav>
       <a href="#salas">Salas</a>
+      <a href="#planos">Planos</a>
       <a href="#como-funciona">Como funciona</a>
       <a href="#local">Localização</a>
       <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
@@ -37,8 +38,8 @@
         <h1 data-c="hero_titulo" data-rich></h1>
         <p class="lead" data-c="hero_texto"></p>
         <div class="hero-actions">
-          <a class="btn" href="#agenda">Escolher meus horários</a>
-          <a class="btn ghost" href="#salas">Ver as salas</a>
+          <a class="btn" href="#salas">Ver salas e horários</a>
+          <a class="btn ghost" href="#planos">Planos e preços</a>
         </div>
         <div class="facts" id="facts"></div>
       </div>
@@ -91,28 +92,16 @@
     </div>
   </section>
 
-  <section class="band" id="agenda">
+  <section class="band" id="planos">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">Monte sua agenda</span>
-        <h2>Quais horários você precisa?</h2>
-        <p id="agenda-texto"></p>
+        <span class="eyebrow">Planos e preços</span>
+        <h2>Quanto mais você usa, menos paga por <em>hora</em></h2>
+        <p>Os planos valem para qualquer sala. Escolha a sala para ver os horários livres e fazer sua pré-reserva.</p>
       </div>
-      <div class="planner">
-        <div class="card">
-          <div class="sched-scroll"><table class="sched" id="sched"><thead></thead><tbody></tbody></table></div>
-          <p class="hint">Cada hora comporta uma sessão de 50 minutos, com folga para receber o próximo paciente.</p>
-        </div>
-        <form class="card req" id="req" novalidate>
-          <div class="field" id="f-sala-wrap"><label for="f-sala">Sala</label><select id="f-sala"></select></div>
-          <div class="field"><label for="f-nome">Seu nome</label><input id="f-nome" type="text" autocomplete="name" placeholder="Ex.: Ana Souza"></div>
-          <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
-          <div class="field"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" placeholder="Ex.: quero começar em janeiro"></textarea></div>
-          <div class="summary" id="summary" aria-live="polite">Nenhum horário marcado ainda.</div>
-          <button class="btn" type="submit">Enviar pelo WhatsApp</button>
-          <div class="contact-line">Ou chame direto: <strong data-c="telefone"></strong></div>
-        </form>
-      </div>
+      <div class="plans" id="plans"></div>
+      <ul class="rules" id="regras"></ul>
+      <a class="btn" href="#salas">Escolher uma sala</a>
     </div>
   </section>
 

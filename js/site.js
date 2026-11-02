@@ -57,56 +57,14 @@
     }
     const body = el("div", { class: "room-body" });
     body.innerHTML = `<h3>${esc(r.name)}</h3>${r.description ? `<p>${esc(r.description)}</p>` : ""}${(r.features || []).length ? `<ul>${r.features.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}`;
-    const go = el("a", { class: "btn", href: "#agenda" }, "Ver horários desta sala");
-    go.onclick = () => { $("#f-sala").value = r.name; update(); };
-    body.appendChild(go);
+    body.appendChild(el("a", { class: "btn", href: `sala.html?id=${encodeURIComponent(r.id)}` }, "Ver sala e reservar"));
     card.appendChild(body);
     roomsBox.appendChild(card);
   });
 
-  // agenda
-  const days = (C.dias && C.dias.length ? C.dias : M.DEFAULTS.dias);
-  const h0 = Number(C.hora_inicio ?? 8), h1 = Number(C.hora_fim ?? 18);
-  $("#agenda-texto").textContent = `Escolha a sala e toque nos horários que te interessam. Cada período é de 1 hora, das ${h0}h às ${h1}h. A mensagem para o WhatsApp é montada com as suas escolhas e a gente responde com a disponibilidade e os valores.`;
-  $("#sched thead").innerHTML = `<tr><th></th>${days.map(d => `<th scope="col">${esc(d)}</th>`).join("")}</tr>`;
-  const tbody = $("#sched tbody");
-  for (let h = h0; h < h1; h++) {
-    const tr = el("tr");
-    tr.innerHTML = `<th scope="row">${h}h</th>`;
-    days.forEach(d => {
-      const td = el("td");
-      const b = el("button", { type: "button", class: "slot", "aria-pressed": "false", "aria-label": `${d} às ${h}h`, "data-day": d, "data-hour": `${h}h` });
-      b.onclick = () => { b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true"); update(); };
-      td.appendChild(b); tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  }
-
-  const sala = $("#f-sala");
-  sala.innerHTML = rooms.length > 1 ? `<option value="">Qualquer sala</option>` : "";
-  sala.innerHTML += rooms.map(r => `<option>${esc(r.name)}</option>`).join("");
-  $("#f-sala-wrap").hidden = rooms.length === 0;
-  sala.onchange = update;
-  $("#f-prof").innerHTML = [...(C.publico_lista || []), "Outra área da saúde"].map(p => `<option>${esc(p)}</option>`).join("");
-
-  function picked() {
-    const out = {};
-    document.querySelectorAll('.slot[aria-pressed="true"]').forEach(b => (out[b.dataset.day] ||= []).push(b.dataset.hour));
-    return days.filter(d => out[d]).map(d => `${d}: ${out[d].join(", ")}`);
-  }
-  function update() {
-    const n = document.querySelectorAll('.slot[aria-pressed="true"]').length;
-    const s = sala.value ? `<br>${esc(sala.value)}` : "";
-    $("#summary").innerHTML = n ? `<b>${n} hora${n > 1 ? "s" : ""} por semana</b>${s}<br>${esc(picked().join(" · "))}` : "Nenhum horário marcado ainda.";
-  }
-  $("#req").addEventListener("submit", e => {
-    e.preventDefault();
-    const nome = $("#f-nome").value.trim(), prof = $("#f-prof").value, obs = $("#f-obs").value.trim(), p = picked();
-    let m = `Olá! ${nome ? `Sou ${nome}, ` : ""}${prof.toLowerCase()}, e tenho interesse em alugar ${sala.value ? `a ${sala.value}` : "uma sala"} da Morada do Ser.`;
-    m += p.length ? `\n\nHorários que procuro:\n- ${p.join("\n- ")}` : `\n\nGostaria de saber os horários disponíveis.`;
-    if (obs) m += `\n\n${obs}`;
-    m += `\n\nPoderia me passar a disponibilidade e os valores?`;
-    window.open(wa(m), "_blank", "noopener");
-  });
-  update();
+  // planos
+  $("#plans").innerHTML = M.plans(C).map(p => `<article class="plan">
+      ${p.off > 0 ? `<span class="off">−${p.off}%</span>` : ""}
+      <h3>${esc(p.nome)}</h3><strong>${esc(p.preco)}</strong><p>${esc(p.desc)}</p></article>`).join("");
+  $("#regras").innerHTML = (C.regras || []).map(r => `<li>${esc(r)}</li>`).join("");
 })();

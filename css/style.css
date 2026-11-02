@@ -136,3 +136,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 .notice{background:var(--rose-soft);color:var(--ink);font-size:.88rem;padding:10px 0;text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* planos (página inicial) */
+.plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.plan{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:6px}
+.plan strong{font-family:var(--display);font-weight:500;font-size:1.4rem;color:var(--accent)}
+.plan p{color:var(--muted);font-size:.9rem}
+.plan .off{position:absolute;top:14px;right:14px;font-size:.72rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--rose);color:var(--rose-ink)}
+.rules{margin:0 0 28px;padding-left:1.2em;color:var(--muted);font-size:.92rem;display:flex;flex-direction:column;gap:4px}

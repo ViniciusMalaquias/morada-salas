@@ -67,3 +67,57 @@ header.top nav a{font-size:.92rem}
 .toast.error{background:var(--danger);color:#fff}
 body.admin section{padding-block:0}
 .photos:empty{display:block}
+
+/* reservas */
+.count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--rose);color:var(--rose-ink);font-size:.72rem;margin-left:4px}
+.chips-f{display:flex;gap:8px;flex-wrap:wrap}
+.chips-f button{font:500 .88rem var(--body);padding:.5em 1em;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.chips-f button[aria-pressed="true"]{border-color:var(--rose);background:var(--rose-soft);color:var(--accent)}
+.bloq{margin-bottom:20px}
+.bloq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.row-actions{display:flex;gap:10px;flex-wrap:wrap}
+.res-list{display:flex;flex-direction:column;gap:14px;margin-bottom:28px}
+.res{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.res.st-pendente{border-left-color:var(--rose)}
+.res.st-confirmada{border-left-color:#5f8a6a}
+.res-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.res .pill.st{background:var(--surface);color:var(--muted)}
+.res.st-pendente .pill.st{background:var(--rose-soft);color:var(--accent)}
+.res.st-confirmada .pill.st{background:#e3efe6;color:#3f6b4a}
+.res-body{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:.92rem}
+@media (max-width:700px){.res-body{grid-template-columns:minmax(0,1fr)}}
+.res-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+.res-dl dt{color:var(--muted)}
+.res-dl dd{margin:0;overflow-wrap:anywhere}
+.res-when ul{margin:4px 0 0;padding-left:1.1em}
+.res-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.money{display:flex;align-items:center;gap:8px;max-width:160px}
+.money input{font:inherit;padding:.6em .75em;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.hours{display:flex;flex-direction:column;gap:8px}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hrow .check{min-width:72px}
+.hrow select{font:inherit;padding:.4em .6em;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.hrow select:disabled{opacity:.4}
+.agenda-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.agenda-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.agenda-ctrl select{font:inherit;padding:.45em .7em;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.agenda-ctrl strong{min-width:120px;text-align:center;font-variant-numeric:tabular-nums}
+.cal-scroll{overflow-x:auto}
+table.agcal{border-collapse:separate;border-spacing:3px;width:100%;min-width:520px;font-size:.78rem;font-variant-numeric:tabular-nums;table-layout:fixed}
+.agcal th{color:var(--muted);font-weight:600;text-align:center}
+.agcal th small{display:block;font-weight:400}
+.agcal th[scope=row]{width:42px;text-align:right;padding-right:4px}
+.agcal td{height:26px;border-radius:5px;background:var(--bg);border:1px solid var(--line);padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agcal td.c-closed{background:repeating-linear-gradient(45deg,transparent 0 5px,var(--line) 5px 6px);opacity:.5}
+.agcal td.conf{background:#e3efe6;border-color:#a9c9b1;color:#2f5a3a}
+.agcal td.pend{background:var(--rose-soft);border-color:var(--rose);color:var(--accent)}
+.agcal td.blk{background:var(--surface);border-color:var(--muted);color:var(--muted)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-top:8px}
+.legend span{display:flex;align-items:center;gap:6px}
+.lg{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);display:inline-block}
+.lg.conf{background:#e3efe6;border-color:#a9c9b1}.lg.pend{background:var(--rose-soft);border-color:var(--rose)}.lg.blk{background:var(--surface);border-color:var(--muted)}
+@media (prefers-color-scheme: dark){
+  .res.st-confirmada .pill.st,.agcal td.conf,.lg.conf{background:#22362a;color:#a8d3b4;border-color:#3e6b4c}
+}
+
+.agcal thead th:first-child{width:42px}

@@ -9,6 +9,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, isError ? 6000 : 2800);
   }
   const fail = (what, e) => { console.error(e); toast(`${what}: ${e?.message || "erro desconhecido"}`, true); };
+  window.MoradaAdmin = { toast, fail };
 
   if (!sb) { show("#v-config"); return; }
 
@@ -46,7 +47,7 @@
   $("#logout").addEventListener("click", () => sb.auth.signOut());
 
   // ---------- abas ----------
-  const tabs = [["#t-salas", "#p-salas"], ["#t-textos", "#p-textos"]];
+  const tabs = [["#t-reservas", "#p-reservas"], ["#t-salas", "#p-salas"], ["#t-textos", "#p-textos"]];
   tabs.forEach(([t, p]) => $(t).addEventListener("click", () => tabs.forEach(([t2, p2]) => {
     $(t2).setAttribute("aria-selected", t2 === t ? "true" : "false"); $(p2).hidden = p2 !== p;
   })));
@@ -55,6 +56,7 @@
     started = true;
     show("#v-app"); $("#top-actions").hidden = false;
     await Promise.all([renderRooms(), renderTextos()]);
+    window.dispatchEvent(new CustomEvent("morada:start"));
   }
 
   // ---------- imagens ----------
@@ -204,6 +206,20 @@
     const hint = fd.hint ? `<p class="hint">${fd.hint}</p>` : "";
     if (fd.type === "text") { w.innerHTML = label + `<input id="${id}" type="text">` + hint; w.querySelector("input").value = val ?? ""; }
     if (fd.type === "number") { w.innerHTML = label + `<input id="${id}" type="number" min="${fd.min}" max="${fd.max}" style="max-width:120px">`; w.querySelector("input").value = val ?? ""; }
+    if (fd.type === "money") { w.innerHTML = label + `<div class="money"><span>R$</span><input id="${id}" type="number" min="0" step="0.5" inputmode="decimal"></div>`; w.querySelector("input").value = val ?? ""; }
+    if (fd.type === "hours") {
+      const hs = Array.from({ length: 25 }, (_, h) => h);
+      const opt = (sel) => hs.map(h => `<option value="${h}" ${h === sel ? "selected" : ""}>${h}h</option>`).join("");
+      w.innerHTML = `<label>${fd.label}</label><div class="hours">${M.ALL_DAYS.map(d => { const v = (val || {})[d];
+        return `<div class="hrow" data-d="${d}"><label class="check"><input type="checkbox" ${v ? "checked" : ""}> ${d}</label>
+          <select aria-label="${d}: abre" ${v ? "" : "disabled"}>${opt(v ? v[0] : 8)}</select><span>às</span>
+          <select aria-label="${d}: fecha" ${v ? "" : "disabled"}>${opt(v ? v[1] : 18)}</select></div>`; }).join("")}</div>`;
+      w.querySelectorAll(".hrow").forEach(r => r.querySelector("input").addEventListener("change", e => r.querySelectorAll("select").forEach(s => s.disabled = !e.target.checked)));
+    }
+    if (fd.type === "periods") {
+      w.innerHTML = label + `<textarea id="${id}" rows="4"></textarea><p class="hint">Formato: Nome início-fim. Ex.: Tarde 14-18</p>`;
+      w.querySelector("textarea").value = (val || []).map(p => `${p.nome} ${p.ini}-${p.fim}`).join("\n");
+    }
     if (fd.type === "textarea" || fd.type === "list") {
       w.innerHTML = label + `<textarea id="${id}" rows="${fd.type === "list" ? 6 : 3}"></textarea>` + hint;
       w.querySelector("textarea").value = fd.type === "list" ? (val || []).join("\n") : (val ?? "");
@@ -244,7 +260,9 @@
   function readField(w) {
     const t = w.dataset.type;
     if (t === "text" || t === "textarea") return w.querySelector("input,textarea").value.trim();
-    if (t === "number") return Number(w.querySelector("input").value);
+    if (t === "number" || t === "money") return Number(w.querySelector("input").value);
+    if (t === "hours") { const o = {}; w.querySelectorAll(".hrow").forEach(r => { const [a, b] = r.querySelectorAll("select"); o[r.dataset.d] = r.querySelector("input").checked ? [+a.value, +b.value] : null; }); return o; }
+    if (t === "periods") return w.querySelector("textarea").value.split("\n").map(l => l.trim().match(/^(.+?)\s+(\d{1,2})\s*-\s*(\d{1,2})$/)).filter(Boolean).map(m => ({ nome: m[1], ini: +m[2], fim: +m[3] }));
     if (t === "list") return w.querySelector("textarea").value.split("\n").map(s => s.trim()).filter(Boolean);
     if (t === "days") return [...w.querySelectorAll("input:checked")].map(i => i.value);
     if (t === "image") return w.dataset.value || "";
@@ -255,8 +273,14 @@
     e.preventDefault();
     const rows = [...e.target.querySelectorAll(".field[data-key]")].map(w => ({ key: w.dataset.key, value: readField(w), updated_at: new Date().toISOString() }));
     const get = k => rows.find(r => r.key === k)?.value;
-    if (!(get("hora_fim") > get("hora_inicio"))) return toast("O fim do último horário precisa ser depois do primeiro horário.", true);
-    if (!get("dias")?.length) return toast("Marque pelo menos um dia de funcionamento.", true);
+    const hrs = get("horarios") || {};
+    if (!Object.values(hrs).some(Boolean)) return toast("Marque pelo menos um dia de funcionamento.", true);
+    const badDay = Object.entries(hrs).find(([, v]) => v && !(v[1] > v[0]));
+    if (badDay) return toast(`${badDay[0]}: o horário de fechar precisa ser depois do de abrir.`, true);
+    const per = get("periodos") || [];
+    if (!per.length || per.some(p => !(p.fim > p.ini))) return toast("Confira os períodos: use o formato Nome início-fim, ex.: Tarde 14-18.", true);
+    for (const k of ["preco_avulso", "pacote_horas", "pacote_preco", "pacote_validade", "preco_periodo", "preco_quinzenal", "semanal_1", "semanal_4", "semanal_8"])
+      if (!(get(k) > 0)) return toast("Preencha todos os preços e números do pacote com valores maiores que zero.", true);
     const { error } = await sb.from("site_content").upsert(rows);
     if (error) return fail("Erro ao salvar textos", error);
     $("#textos-status").textContent = "Tudo salvo."; toast("Textos salvos. O site já mostra a versão nova.");

@@ -59,11 +59,54 @@
   <!-- painel -->
   <section id="v-app" hidden>
     <div class="tabs" role="tablist">
-      <button role="tab" id="t-salas" aria-selected="true" aria-controls="p-salas">Salas</button>
-      <button role="tab" id="t-textos" aria-selected="false" aria-controls="p-textos">Textos e contato</button>
+      <button role="tab" id="t-reservas" aria-selected="true" aria-controls="p-reservas">Reservas <span class="count" id="pend-count" hidden></span></button>
+      <button role="tab" id="t-salas" aria-selected="false" aria-controls="p-salas">Salas</button>
+      <button role="tab" id="t-textos" aria-selected="false" aria-controls="p-textos">Textos, preços e horários</button>
     </div>
 
-    <div id="p-salas" role="tabpanel" aria-labelledby="t-salas">
+    <div id="p-reservas" role="tabpanel" aria-labelledby="t-reservas">
+      <div class="bar">
+        <div class="chips-f" role="group" aria-label="Filtrar reservas">
+          <button type="button" data-f="pendente" aria-pressed="true">Pendentes</button>
+          <button type="button" data-f="confirmada" aria-pressed="false">Confirmadas</button>
+          <button type="button" data-f="encerradas" aria-pressed="false">Recusadas e canceladas</button>
+          <button type="button" data-f="bloqueio" aria-pressed="false">Bloqueios</button>
+        </div>
+        <button class="btn ghost small" id="btn-bloq" type="button">+ Bloquear horário</button>
+      </div>
+
+      <form class="group bloq" id="f-bloq" hidden novalidate>
+        <h3>Bloquear horário</h3>
+        <p class="muted small">Use para horários em que a própria clínica vai usar a sala. O horário some do site.</p>
+        <div class="bloq-grid">
+          <div class="field"><label for="b-sala">Sala</label><select id="b-sala"></select></div>
+          <div class="field"><label for="b-data">Data</label><input id="b-data" type="date" required></div>
+          <div class="field"><label for="b-ini">Das</label><select id="b-ini"></select></div>
+          <div class="field"><label for="b-fim">Até</label><select id="b-fim"></select></div>
+          <div class="field"><label for="b-freq">Repetir</label><select id="b-freq"><option value="unica">Não repetir</option><option value="semanal">Toda semana</option><option value="quinzenal">A cada 15 dias</option></select></div>
+          <div class="field"><label for="b-motivo">Motivo</label><input id="b-motivo" type="text" placeholder="Ex.: atendimento da clínica"></div>
+        </div>
+        <div class="row-actions"><button class="btn" type="submit">Salvar bloqueio</button><button class="btn ghost" type="button" id="b-cancel">Cancelar</button></div>
+      </form>
+
+      <div id="res-list" class="res-list"></div>
+
+      <div class="group agenda">
+        <div class="agenda-head">
+          <h3>Agenda da semana</h3>
+          <div class="agenda-ctrl">
+            <select id="ag-sala" aria-label="Sala"></select>
+            <button type="button" class="icon" id="ag-prev" aria-label="Semana anterior">←</button>
+            <strong id="ag-label"></strong>
+            <button type="button" class="icon" id="ag-next" aria-label="Próxima semana">→</button>
+          </div>
+        </div>
+        <div class="cal-scroll"><table class="agcal" id="agcal"></table></div>
+        <div class="legend"><span><i class="lg conf"></i>Confirmada</span><span><i class="lg pend"></i>Pendente</span><span><i class="lg blk"></i>Bloqueio</span></div>
+      </div>
+    </div>
+
+    <div id="p-salas" role="tabpanel" aria-labelledby="t-salas" hidden>
       <div class="bar">
         <p class="muted">Use as setas para mudar a ordem das salas. Salas ocultas não aparecem no site.</p>
         <button class="btn" id="add-room" type="button">+ Adicionar sala</button>
@@ -117,5 +160,6 @@
 <script src="js/config.js"></script>
 <script src="js/content.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/admin-reservas.js"></script>
 </body>
 </html>

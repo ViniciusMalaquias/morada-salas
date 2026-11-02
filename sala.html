@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sala · Morada do Ser</title>
+<meta name="description" content="Veja a sala, os horários livres e faça sua pré-reserva na Clínica Morada do Ser.">
+<link rel="icon" href="img/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/sala.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html" aria-label="Clínica Morada do Ser, página inicial">
+      <span class="logo" aria-hidden="true"></span>
+      <span><b>Clínica</b><em>Morada do Ser</em></span>
+    </a>
+    <nav>
+      <a href="index.html#salas">Todas as salas</a>
+      <a href="index.html#planos">Planos</a>
+      <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="room-hero">
+    <div class="wrap">
+      <a class="back" href="index.html#salas">← Todas as salas</a>
+      <div class="room-top" id="room-top">
+        <p class="hint">Carregando sala…</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="reservar" hidden>
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Reservar esta sala</span>
+        <h2>Monte sua <em>reserva</em></h2>
+        <p>Escolha o plano e os horários. A pré-reserva segura o horário e a clínica confirma pelo WhatsApp.</p>
+      </div>
+
+      <div class="booking">
+        <div class="steps-col">
+          <div class="step">
+            <h3><span class="n">1</span> Escolha o plano</h3>
+            <div class="plan-pick" id="plan-pick" role="radiogroup" aria-label="Plano"></div>
+          </div>
+
+          <div class="step" id="step-time" hidden>
+            <h3><span class="n">2</span> <span id="time-title">Escolha os horários</span></h3>
+            <p class="hint" id="time-hint"></p>
+            <div class="rec-start" id="rec-start" hidden>
+              <label for="f-inicio">Começar em</label>
+              <input type="date" id="f-inicio">
+            </div>
+            <div class="weeknav" id="weeknav">
+              <button type="button" class="icon" id="wk-prev" aria-label="Semana anterior">←</button>
+              <strong id="wk-label"></strong>
+              <button type="button" class="icon" id="wk-next" aria-label="Próxima semana">→</button>
+            </div>
+            <div class="cal-scroll"><table class="cal" id="cal"></table></div>
+            <div class="legend"><span><i class="lg free"></i>Livre</span><span><i class="lg sel"></i>Escolhido</span><span><i class="lg busy"></i>Ocupado</span></div>
+          </div>
+
+          <div class="step" id="step-data" hidden>
+            <h3><span class="n">3</span> Seus dados</h3>
+            <form id="f-res" class="form-grid" novalidate>
+              <div class="field"><label for="f-nome">Nome completo</label><input id="f-nome" type="text" autocomplete="name" required></div>
+              <div class="field"><label for="f-tel">WhatsApp com DDD</label><input id="f-tel" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 90000-0000" required></div>
+              <div class="field"><label for="f-email">E-mail (opcional)</label><input id="f-email" type="email" autocomplete="email"></div>
+              <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
+              <div class="field"><label for="f-reg">Registro profissional (opcional)</label><input id="f-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
+              <div class="field wide"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" rows="2"></textarea></div>
+            </form>
+          </div>
+        </div>
+
+        <aside class="summary-col">
+          <div class="card sumcard" id="sumcard">
+            <h3>Resumo</h3>
+            <div id="sum-body"><p class="hint">Escolha um plano para começar.</p></div>
+            <p class="err" id="sum-err" hidden></p>
+            <button class="btn" id="btn-send" type="button" disabled>Enviar pré-reserva</button>
+            <p class="hint small">Nada é cobrado agora. A clínica confirma a reserva e combina o pagamento com você.</p>
+          </div>
+        </aside>
+      </div>
+
+      <div class="card done" id="done" hidden>
+        <h3>Pré-reserva enviada!</h3>
+        <p>Código <strong id="done-code"></strong>. Os horários ficam reservados para você até a clínica confirmar.</p>
+        <p>Para agilizar, avise a clínica pelo WhatsApp:</p>
+        <a class="btn" id="done-wa" href="#" target="_blank" rel="noopener">Avisar no WhatsApp</a>
+        <a class="btn ghost" href="index.html">Voltar ao início</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span data-c="rodape"></span>
+    <a href="admin.html">Área da equipe</a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="js/sala.js"></script>
+</body>
+</html>
