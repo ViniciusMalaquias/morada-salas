@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Salas para atendimento · Morada do Ser</title>
+<meta name="description" content="Salas para atendimento clínico por hora na Clínica Morada do Ser, no Vianelo, Jundiaí.">
+<link rel="icon" href="img/logo.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="notice" id="demo-notice" hidden>Modo demonstração: conecte o Supabase em <code>js/config.js</code> para carregar as salas reais.</div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#" aria-label="Clínica Morada do Ser">
+      <span class="logo" aria-hidden="true"></span>
+      <span><b>Clínica</b><em>Morada do Ser</em></span>
+    </a>
+    <nav>
+      <a href="#salas">Salas</a>
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#local">Localização</a>
+      <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-copy">
+        <span class="eyebrow" data-c="eyebrow"></span>
+        <h1 data-c="hero_titulo" data-rich></h1>
+        <p class="lead" data-c="hero_texto"></p>
+        <div class="hero-actions">
+          <a class="btn" href="#agenda">Escolher meus horários</a>
+          <a class="btn ghost" href="#salas">Ver as salas</a>
+        </div>
+        <div class="facts" id="facts"></div>
+      </div>
+      <div class="arch" id="hero-photo">
+        <div class="ph"><div><svg viewBox="0 0 48 48"><path d="M10 40V20a14 14 0 0 1 28 0v20" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 40h36" stroke="currentColor" stroke-width="2"/><circle cx="31" cy="30" r="1.6" fill="currentColor"/></svg>Foto em breve</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Para quem é</span>
+        <h2 data-c="publico_titulo" data-rich></h2>
+        <p data-c="publico_texto"></p>
+      </div>
+      <div class="chips" id="publico"></div>
+    </div>
+  </section>
+
+  <section id="salas">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">As salas</span>
+        <h2 data-c="salas_titulo" data-rich></h2>
+        <p data-c="salas_texto"></p>
+      </div>
+      <div class="rooms" id="rooms"><p class="hint">Carregando salas…</p></div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">A estrutura</span>
+        <h2 data-c="estrutura_titulo" data-rich></h2>
+        <p data-c="estrutura_texto"></p>
+      </div>
+      <div class="grid-feat" id="estrutura"></div>
+    </div>
+  </section>
+
+  <section id="como-funciona">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Como funciona</span>
+        <h2>Do primeiro contato à primeira sessão</h2>
+      </div>
+      <ol class="steps" id="passos"></ol>
+    </div>
+  </section>
+
+  <section class="band" id="agenda">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Monte sua agenda</span>
+        <h2>Quais horários você precisa?</h2>
+        <p id="agenda-texto"></p>
+      </div>
+      <div class="planner">
+        <div class="card">
+          <div class="sched-scroll"><table class="sched" id="sched"><thead></thead><tbody></tbody></table></div>
+          <p class="hint">Cada hora comporta uma sessão de 50 minutos, com folga para receber o próximo paciente.</p>
+        </div>
+        <form class="card req" id="req" novalidate>
+          <div class="field" id="f-sala-wrap"><label for="f-sala">Sala</label><select id="f-sala"></select></div>
+          <div class="field"><label for="f-nome">Seu nome</label><input id="f-nome" type="text" autocomplete="name" placeholder="Ex.: Ana Souza"></div>
+          <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
+          <div class="field"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" placeholder="Ex.: quero começar em janeiro"></textarea></div>
+          <div class="summary" id="summary" aria-live="polite">Nenhum horário marcado ainda.</div>
+          <button class="btn" type="submit">Enviar pelo WhatsApp</button>
+          <div class="contact-line">Ou chame direto: <strong data-c="telefone"></strong></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="local">
+    <div class="wrap loc">
+      <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+        <div class="sec-head" style="margin:0">
+          <span class="eyebrow">Onde fica</span>
+          <h2>Venha conhecer a clínica</h2>
+        </div>
+        <dl>
+          <dt>Endereço</dt><dd><span data-c="endereco"></span><br><span data-c="bairro_cidade"></span></dd>
+          <dt>WhatsApp</dt><dd data-c="telefone"></dd>
+          <dt>E‑mail</dt><dd data-c="email"></dd>
+        </dl>
+      </div>
+      <a class="mapcard" id="map" href="#" target="_blank" rel="noopener"><span>Abrir no Google Maps</span></a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span data-c="rodape"></span>
+    <a href="admin.html">Área da equipe</a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/content.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
