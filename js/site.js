@@ -19,7 +19,9 @@
 
   const wa = (text) => `https://wa.me/${String(C.whatsapp || "").replace(/\D/g, "")}${text ? "?text=" + encodeURIComponent(text) : ""}`;
   document.querySelectorAll("[data-wa]").forEach(a => a.href = wa());
-  $("#map").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${C.endereco} ${C.bairro_cidade}`);
+  const addr = `${C.endereco}, ${C.bairro_cidade}`.replace(" · ", ", ");
+  $("#map").href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr);
+  $("#map-frame").src = "https://maps.google.com/maps?q=" + encodeURIComponent(addr) + "&z=16&hl=pt-BR&output=embed";
 
   // destaques
   $("#facts").innerHTML = (C.destaques || []).slice(0, 3).map(d => `<div><strong>${esc(d.titulo)}</strong><span>${esc(d.texto)}</span></div>`).join("");
