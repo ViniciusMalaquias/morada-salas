@@ -26,11 +26,11 @@
   // ---------- sessão ----------
   let started = false, me = null, profile = {};
   const recovering = location.hash.includes("type=recovery");
-  sb.auth.onAuthStateChange((event, session) => {
+  sb.auth.onAuthStateChange((event, session) => setTimeout(() => {   // fora do callback para não travar o Supabase
     if (event === "PASSWORD_RECOVERY") { show("#v-reset"); return; }
     if (session && !started && !recovering) startIn(session.user);
     if (!session) { started = false; show("#v-out"); }
-  });
+  }, 0));
   const { data: { session } } = await sb.auth.getSession();
   if (!session && !recovering) show("#v-out");
 

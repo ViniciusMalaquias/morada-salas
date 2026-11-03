@@ -257,13 +257,14 @@
   const fmtDateTime = d => d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   // Link "Entrar / Minha conta" no topo das páginas públicas
-  async function paintAccountLinks() {
+  async function paintAccountLinks(session) {
     const els = document.querySelectorAll("[data-account]"); if (!els.length) return;
-    const u = await getUser().catch(() => null);
+    const u = session !== undefined ? session?.user : await getUser().catch(() => null);
     els.forEach(a => { a.href = "conta.html"; a.textContent = u ? "Minha conta" : "Entrar"; });
   }
-  if (client) client.auth.onAuthStateChange(() => paintAccountLinks());
-  document.addEventListener("DOMContentLoaded", paintAccountLinks);
+  // Importante: nunca chamar o Supabase direto dentro do onAuthStateChange (trava todas as consultas).
+  if (client) client.auth.onAuthStateChange((_e, session) => setTimeout(() => paintAccountLinks(session || null), 0));
+  document.addEventListener("DOMContentLoaded", () => paintAccountLinks());
 
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,

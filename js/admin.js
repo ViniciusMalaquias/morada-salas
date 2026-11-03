@@ -18,11 +18,11 @@
 
   // ---------- autenticação ----------
   let started = false;
-  sb.auth.onAuthStateChange((event, session) => {
+  sb.auth.onAuthStateChange((event, session) => setTimeout(() => {   // fora do callback para não travar o Supabase
     if (event === "PASSWORD_RECOVERY") { show("#v-reset"); return; }
     if (session && !started && !location.hash.includes("type=recovery")) start();
     if (!session) { started = false; show("#v-login"); }
-  });
+  }, 0));
   const { data: { session } } = await sb.auth.getSession();
   if (!session && !location.hash.includes("type=recovery")) show("#v-login");
 
