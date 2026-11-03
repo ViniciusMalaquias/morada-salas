@@ -52,6 +52,7 @@
   let plan = null, week = firstWeek, sel = new Set(), occ = {}, loading = false;
   const startInput = $("#f-inicio");
   startInput.min = todayIso;
+  startInput.max = M.iso(M.addDays(now, 90));
   startInput.value = M.iso(M.addDays(now, 1));
 
   const mode = () => !plan ? null : (plan === "avulso" || plan === "pacote") ? "hora" : plan === "periodo" ? "periodo" : "fixo";
@@ -77,7 +78,8 @@
       "Toque nas horas que vão se repetir a cada 15 dias.";
     refresh();
   }));
-  startInput.addEventListener("change", () => { if (startInput.value < todayIso) startInput.value = todayIso; sel.clear(); occ = {}; refresh(); });
+  startInput.addEventListener("change", () => { if (startInput.value < todayIso) startInput.value = todayIso;
+    if (startInput.value > startInput.max) startInput.value = startInput.max; sel.clear(); occ = {}; refresh(); });
   $("#wk-prev").onclick = () => { week = M.addDays(week, -7); refresh(); };
   $("#wk-next").onclick = () => { week = M.addDays(week, 7); refresh(); };
 
@@ -314,6 +316,7 @@
       return;
     }
     const code = data.codigo;
+    if (data.total != null) r.total = Number(data.total); // valor calculado pela clínica (banco)
     const prazo = Number(C.prazo_pagamento_horas || 24);
     const ate = M.fmtDateTime(new Date(Date.now() + prazo * 3600e3));
     $("#done-code").textContent = code;

@@ -104,7 +104,8 @@
     profile = prof || {};
     $("#hello").textContent = profile.nome ? `Olá, ${profile.nome.split(" ")[0]}!` : "Olá!";
     $("#to-admin").hidden = !staff;
-    $("#p-cpf").value = M.cpfFormat(profile.cpf || ""); $("#p-nome").value = profile.nome || ""; $("#p-tel").value = profile.telefone || "";
+    $("#p-cpf").value = M.cpfFormat(profile.cpf || ""); $("#p-cpf").readOnly = !!profile.cpf;
+    $("#p-cpf").title = profile.cpf ? "Para corrigir o CPF, fale com a clínica." : ""; $("#p-nome").value = profile.nome || ""; $("#p-tel").value = profile.telefone || "";
     $("#p-reg").value = profile.registro || ""; $("#p-email").value = user.email || "";
     if (profile.profissao) $("#p-prof").value = profile.profissao;
     const { data: n } = await sb.rpc("claim_my_reservations");
@@ -302,7 +303,7 @@
     if (!M.cpfValid(row.cpf)) return toast("CPF inválido. Confira os números.", true);
     if (row.telefone.replace(/\D/g, "").length < 10) return toast("Preencha o telefone de contato com DDD.", true);
     const { error } = await sb.from("profiles").upsert(row);
-    if (error) return toast(/profiles_cpf_idx|duplicate/.test(error.message) ? "Este CPF já está em outra conta. Fale com a clínica." : "Não foi possível salvar. Tente de novo.", true);
+    if (error) return toast(/profiles_cpf_idx|duplicate/.test(error.message) ? "Este CPF já está em outra conta. Fale com a clínica." : /CPF/.test(error.message) ? error.message : "Não foi possível salvar. Tente de novo.", true);
     profile = { ...profile, ...row };
     $("#hello").textContent = `Olá, ${row.nome.split(" ")[0]}!`; toast("Dados salvos.");
     const { data: n } = await sb.rpc("claim_my_reservations");

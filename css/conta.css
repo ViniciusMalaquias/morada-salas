@@ -114,3 +114,6 @@ main.acc section{padding-block:24px}
   .modal-bg,.no-print{display:none!important}
   .modal-card{box-shadow:none;max-height:none;padding:0}
 }
+
+/* CPF travado depois de preenchido */
+input[readonly] { background: rgba(56, 49, 46, .05); color: rgba(56, 49, 46, .7); cursor: not-allowed; }
