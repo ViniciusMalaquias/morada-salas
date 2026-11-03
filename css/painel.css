@@ -28,7 +28,7 @@ body.noscroll{overflow:hidden}
 .nav-i:hover{background:var(--side-hover);color:var(--side-ink)}
 .nav-i[aria-current="page"]{background:var(--side-hover);color:var(--side-ink);box-shadow:inset 3px 0 0 var(--rose)}
 .nav-i[aria-current="page"] svg{color:var(--rose)}
-.badge{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--rose);color:#fff;font:600 .75rem/22px var(--body);text-align:center}
+.badge{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:var(--fill);color:#fff;font:600 .75rem/22px var(--body);text-align:center}
 .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:12px;border-top:1px solid var(--side-hover);font-size:.84rem}
 .me{color:var(--side-muted);overflow-wrap:anywhere}
 .side-links{display:flex;justify-content:space-between;gap:10px}

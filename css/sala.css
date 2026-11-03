@@ -24,7 +24,7 @@
 .steps-col{display:flex;flex-direction:column;gap:22px;min-width:0}
 .step{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .step h3{display:flex;align-items:center;gap:10px}
-.step .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--rose);color:var(--rose-ink);font:600 .9rem var(--body)}
+.step .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--fill);color:var(--rose-ink);font:600 .9rem var(--body)}
 
 .plan-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
 .pick{position:relative;cursor:pointer}
@@ -36,7 +36,7 @@
 .pick-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .pick strong{font-family:var(--display);font-weight:500;font-size:1.2rem;color:var(--accent)}
 .pick small{color:var(--muted);font-size:.8rem;line-height:1.45}
-.off{font-size:.72rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--rose);color:var(--rose-ink);white-space:nowrap}
+.off{font-size:.72rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--fill);color:var(--rose-ink);white-space:nowrap}
 
 .rec-start{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.92rem;font-weight:600}
 .rec-start input{font:inherit;padding:.5em .7em;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
@@ -59,13 +59,13 @@ table.cal{border-collapse:separate;border-spacing:4px;width:100%;min-width:420px
 .cell{width:100%;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--card);cursor:pointer;font:600 .72rem var(--body);color:var(--accent);padding:0}
 .cal.periods .cell{height:44px}
 .cell.free:hover{border-color:var(--rose);background:var(--rose-soft)}
-.cell.sel{background:var(--rose);border-color:var(--rose);color:var(--rose-ink)}
+.cell.sel{background:var(--fill);border-color:var(--fill);color:var(--rose-ink)}
 .cell.busy{background:var(--surface);color:var(--muted);cursor:not-allowed;font-weight:500;font-size:.66rem}
 .cell.past{background:transparent;border-style:dashed;opacity:.4;cursor:default}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
 .legend span{display:flex;align-items:center;gap:6px}
 .lg{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);display:inline-block}
-.lg.free{background:var(--card)}.lg.sel{background:var(--rose);border-color:var(--rose)}.lg.busy{background:var(--surface)}
+.lg.free{background:var(--card)}.lg.sel{background:var(--fill);border-color:var(--fill)}.lg.busy{background:var(--surface)}
 
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .form-grid .wide{grid-column:1/-1}
@@ -123,7 +123,7 @@ table.cal{border-collapse:separate;border-spacing:4px;width:100%;min-width:420px
 .daypick button small{font-size:.75rem;color:var(--muted)}
 .daypick button span{font-size:.7rem;color:var(--accent);font-weight:600;margin-top:2px}
 .daypick button.full span{color:var(--muted);font-weight:500}
-.daypick button[aria-selected="true"]{background:var(--rose);border-color:var(--rose);color:var(--rose-ink)}
+.daypick button[aria-selected="true"]{background:var(--fill);border-color:var(--fill);color:var(--rose-ink)}
 .daypick button[aria-selected="true"] small,.daypick button[aria-selected="true"] span{color:var(--rose-ink)}
 table.cal.one{min-width:0}
 .cal.one thead{display:none}

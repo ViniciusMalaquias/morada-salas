@@ -45,7 +45,7 @@ header.top nav a{font-size:.92rem}
 .photo .tools{position:absolute;inset:auto 0 0 0;display:flex;justify-content:space-between;gap:4px;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.55))}
 .photo .tools button{width:28px;height:28px;border-radius:7px;border:0;background:rgba(255,255,255,.92);color:#38312e;cursor:pointer;font-size:.9rem}
 .photo .tools button:disabled{opacity:.4}
-.photo .cover{position:absolute;top:6px;left:6px;font-size:.7rem;font-weight:600;background:var(--rose);color:#fff;padding:.15em .55em;border-radius:999px}
+.photo .cover{position:absolute;top:6px;left:6px;font-size:.7rem;font-weight:600;background:var(--fill);color:#fff;padding:.15em .55em;border-radius:999px}
 .upload{align-self:flex-start;cursor:pointer}
 
 .group{margin:0;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:14px}
@@ -69,7 +69,7 @@ body.admin section{padding-block:0}
 .photos:empty{display:block}
 
 /* reservas */
-.count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--rose);color:var(--rose-ink);font-size:.72rem;margin-left:4px}
+.count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--fill);color:var(--rose-ink);font-size:.72rem;margin-left:4px}
 .chips-f{display:flex;gap:8px;flex-wrap:wrap}
 .chips-f button{font:500 .88rem var(--body);padding:.5em 1em;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 .chips-f button[aria-pressed="true"]{border-color:var(--rose);background:var(--rose-soft);color:var(--accent)}
