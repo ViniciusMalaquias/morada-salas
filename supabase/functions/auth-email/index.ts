@@ -50,14 +50,14 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply(405, { error: { http_code: 405, message: "use POST" } });
   const payload = await req.text();
   const secret = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").replace(/^v1,whsec_/, "");
-  if (!secret) return reply(500, { error: { http_code: 500, message: "Falta o segredo SEND_EMAIL_HOOK_SECRET" } });
+  if (!secret) { console.error("Falta o segredo SEND_EMAIL_HOOK_SECRET"); return reply(500, { error: { http_code: 500, message: "Falta o segredo SEND_EMAIL_HOOK_SECRET" } }); }
 
   let data: any;
   try { data = new Webhook(secret).verify(payload, Object.fromEntries(req.headers)); }
-  catch { return reply(401, { error: { http_code: 401, message: "Assinatura inválida" } }); }
+  catch (err) { console.error("Assinatura inválida", String(err)); return reply(401, { error: { http_code: 401, message: "Assinatura inválida" } }); }
 
   const user = Deno.env.get("GMAIL_USER"), pass = Deno.env.get("GMAIL_APP_PASSWORD");
-  if (!user || !pass) return reply(500, { error: { http_code: 500, message: "Faltam os segredos GMAIL_USER e GMAIL_APP_PASSWORD" } });
+  if (!user || !pass) { console.error("Faltam os segredos GMAIL_USER/GMAIL_APP_PASSWORD", { user: !!user, pass: !!pass }); return reply(500, { error: { http_code: 500, message: "Faltam os segredos GMAIL_USER e GMAIL_APP_PASSWORD" } }); }
 
   const to: string = data.user?.email;
   const e = data.email_data || {};
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       });
     }
   } catch (err) {
-    console.error("Falha ao enviar", err);
+    console.error("Falha ao enviar", String((err as Error)?.message || err));
     return reply(500, { error: { http_code: 500, message: "Falha ao enviar o e-mail" } });
   }
   return reply(200, {});
