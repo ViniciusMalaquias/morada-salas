@@ -145,3 +145,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .plan .off{position:absolute;top:14px;right:14px;font-size:.72rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--rose);color:var(--rose-ink)}
 .rules{margin:0 0 28px;padding-left:1.2em;color:var(--muted);font-size:.92rem;display:flex;flex-direction:column;gap:4px}
 @media (max-width:720px){header.top nav a[data-account]{display:inline}}
+
+/* reservar mais visível */
+a.room-main{display:block;cursor:pointer}
+a.room-main img{transition:transform .3s ease}
+a.room-main:hover img{transform:scale(1.03)}
+.room h3 a{text-decoration:none}
+.room h3 a:hover{color:var(--accent)}
+.room-body .btn-res{align-self:stretch;margin-top:auto;padding:.9em 1.2em;font-size:.98rem}
+.btn-res svg{width:1.1em;height:1.1em}
