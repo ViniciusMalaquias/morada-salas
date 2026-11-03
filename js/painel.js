@@ -105,7 +105,10 @@
       const r = e.target.closest("[data-open-res]"); if (r) { e.preventDefault(); openRes(r.dataset.openRes); }
       const c = e.target.closest("[data-open-cli]"); if (c) { e.preventDefault(); openCliente(c.dataset.openCli); }
       const m = e.target.closest("[data-mens]"); if (m) { e.preventDefault(); openMensalidade(m.dataset.mens, m.dataset.comp); }
+      const g = e.target.closest("[data-goto]"); if (g) { e.preventDefault(); A().go(g.dataset.goto); }
     });
+    $("#bk-json").onclick = backupJson;
+    $("#bk-csv").onclick = backupCsv;
     $("#drawer").addEventListener("click", e => { if (e.target.closest("[data-close]")) closeDrawer(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#drawer").hidden) closeDrawer(); });
     $("#f-staff").addEventListener("submit", addStaff);
@@ -157,6 +160,8 @@
     pend.forEach(r => { const left = (M.expiresAt(r, C) - now) / 36e5; att.push({ w: left, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot ${left < 3 ? "red" : "amber"}"></span><span><b>${esc(r.nome)}</b> aguarda pagamento<small>${esc(roomName(r.room_id))} · ${M.money(r.total)} · vence ${left < 1 ? "em menos de 1h" : `em ${Math.floor(left)}h`}</small></span></button>` }); });
     all.filter(r => st(r) === "expirada" && (now - M.expiresAt(r, C)) < 7 * 864e5).forEach(r => att.push({ w: 1000, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot gray"></span><span><b>${esc(r.nome)}</b>: prazo de pagamento venceu<small>O horário foi liberado. Recuse ou confirme se ainda estiver livre.</small></span></button>` }));
     mens.filter(m => m.status === "atrasada").forEach(m => att.push({ w: -1, html: `<button type="button" class="att" data-mens="${m.r.id}" data-comp="${m.comp}"><span class="dot red"></span><span><b>${esc(m.r.nome)}</b>: mensalidade de ${MESES[now.getMonth()]} atrasada<small>${esc(roomName(m.r.room_id))} · ${M.money(m.valor)}</small></span></button>` }));
+    const bk = C.ultimo_backup ? new Date(C.ultimo_backup) : null;
+    if (!bk || now - bk > 7 * 864e5) att.push({ w: 2000, html: `<button type="button" class="att" data-goto="equipe"><span class="dot amber"></span><span><b>Fazer o backup da semana</b><small>${bk ? `Último backup em ${M.br(bk)}` : "Nenhum backup baixado ainda"} · leva 10 segundos</small></span></button>` });
     $("#attention").innerHTML = att.length ? att.sort((a, b) => a.w - b.w).map(a => a.html).join("") : `<p class="empty-s">Tudo em dia. ✓</p>`;
 
     $("#occ-bars").innerHTML = ws.length ? ws.map(w => `<div class="bar-row"><span>${esc(w.room.name)}</span><div class="bar"><i style="width:${w.pct}%"></i></div><b>${w.pct}%</b></div>`).join("") : `<p class="empty-s">Nenhuma sala ativa.</p>`;
@@ -538,7 +543,54 @@
   }
 
   // ================= EQUIPE =================
+  // ================= BACKUP =================
+  function paintBackup() {
+    const bk = C.ultimo_backup ? new Date(C.ultimo_backup) : null;
+    $("#bk-last").textContent = bk ? `Último backup: ${M.fmtDateTime(bk)}` : "Nenhum backup baixado ainda.";
+  }
+  function save(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  async function markBackup() {
+    const when = new Date().toISOString();
+    const { error } = await sb.from("site_content").upsert({ key: "ultimo_backup", value: when });
+    if (!error) { C.ultimo_backup = when; paintBackup(); }
+  }
+  async function backupJson() {
+    const b = $("#bk-json"); b.disabled = true; b.textContent = "Gerando…";
+    try {
+      const tables = ["rooms", "room_photos", "site_content", "reservations", "reservation_slots", "payments", "profiles", "staff"];
+      const out = { gerado_em: new Date().toISOString(), projeto: "Salas Morada do Ser", tabelas: {} };
+      for (const t of tables) {
+        let rows = [], from = 0;
+        for (;;) {
+          const { data, error } = await sb.from(t).select("*").range(from, from + 999);
+          if (error) throw new Error(`${t}: ${error.message}`);
+          rows = rows.concat(data); if (data.length < 1000) break; from += 1000;
+        }
+        out.tabelas[t] = rows;
+      }
+      save(`backup-morada-salas-${M.iso(new Date())}.json`, new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+      await markBackup();
+      A().toast("Backup baixado. Guarde o arquivo no Drive da clínica.");
+    } catch (e) { console.error(e); A().toast("Não foi possível gerar o backup: " + e.message, true); }
+    b.disabled = false; b.textContent = "Baixar backup completo";
+  }
+  function backupCsv() {
+    const head = ["Código", "Status", "Plano", "Sala", "Nome", "CPF", "Telefone", "E-mail", "Profissão", "Registro", "Horários", "Total", "Pago (soma)", "Criada em", "Observações"];
+    const rows = all.filter(r => r.plano !== "bloqueio").map(r => [
+      r.codigo, PILL[st(r)]?.[0] || st(r), PLANO[r.plano], roomName(r.room_id), r.nome, r.cpf ? M.cpfFormat(r.cpf) : "", r.telefone, r.email, r.profissao, r.registro,
+      slotsText(r).join(" | "), String(r.total ?? "").replace(".", ","),
+      String((r.payments || []).reduce((s, p) => s + Number(p.valor), 0)).replace(".", ","),
+      new Date(r.created_at).toLocaleString("pt-BR"), r.obs]);
+    const csv = "\ufeff" + [head, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    save(`reservas-morada-salas-${M.iso(new Date())}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  }
+
   async function renderStaff() {
+    paintBackup();
     const { data, error } = await sb.from("staff").select("user_id,email,created_at").order("created_at");
     if (error) return;
     const me = (await M.getUser())?.id;

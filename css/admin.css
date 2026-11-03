@@ -133,3 +133,4 @@ table.agcal{border-collapse:separate;border-spacing:3px;width:100%;min-width:520
 .staff-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
 .staff-list li:last-child{border-bottom:0}
 .staff-add{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+.bk-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
