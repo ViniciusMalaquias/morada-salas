@@ -19,7 +19,7 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 ## Como colocar no ar
 
 1. **Supabase**: crie um projeto em supabase.com (plano grátis atende).
-   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql` e `supabase/008_forma_pagamento.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
+   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql`, `supabase/008_forma_pagamento.sql` e `supabase/009_emails_cliente.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
    - Deixe **Allow new users to sign up** e **Confirm email** ligados (clientes criam conta pelo site).
    - Configure um **SMTP próprio** em **Authentication → Emails → SMTP Settings** (ex.: Resend ou o Gmail da clínica com senha de app). O e-mail padrão do Supabase só envia para membros do projeto, então sem isso clientes não recebem a confirmação de cadastro nem o "esqueci minha senha".
    - Equipe: a primeira pessoa entra na tabela `staff` pelo SQL Editor:
@@ -53,6 +53,11 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 - Cada pré-reserva feita pelo site dispara um e-mail para a clínica (Edge Function `supabase/functions/avisar-reserva`, chamada pelo banco).
 - Em **Edge Functions → Secrets** no Supabase, cadastre `GMAIL_USER` (o Gmail que envia) e `GMAIL_APP_PASSWORD` (senha de app desse Gmail).
 - O destino é o campo "E-mail que recebe o aviso" em **Textos, preços e horários → Contato** (ou o e-mail de contato, se vazio).
+
+## E-mails para o cliente
+
+- Função `supabase/functions/email-cliente`: **pré-reserva recebida** (logo após reservar pelo site), **reserva confirmada** (com Pix copia e cola ou link do cartão) e **lembrete** na véspera (agendamento de hora em hora no banco, para quem foi confirmado com mais de 24h de antecedência).
+- Usa os mesmos segredos do Gmail. Cada e-mail sai uma vez só.
 
 ## E-mails de cadastro e senha
 
