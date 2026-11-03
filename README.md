@@ -54,6 +54,11 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 - Em **Edge Functions → Secrets** no Supabase, cadastre `GMAIL_USER` (o Gmail que envia) e `GMAIL_APP_PASSWORD` (senha de app desse Gmail).
 - O destino é o campo "E-mail que recebe o aviso" em **Textos, preços e horários → Contato** (ou o e-mail de contato, se vazio).
 
+## E-mails de cadastro e senha
+
+- Os e-mails do login (confirmar cadastro, redefinir senha, trocar e-mail) saem pela Edge Function `supabase/functions/auth-email`, ligada como **Send Email Hook** em **Authentication → Auth Hooks** (tipo HTTPS, URL `https://<projeto>.supabase.co/functions/v1/auth-email`).
+- Segredos: `GMAIL_USER`, `GMAIL_APP_PASSWORD` e `SEND_EMAIL_HOOK_SECRET` (gerado pelo Supabase ao criar o hook). Com o hook ligado, os modelos e o SMTP do painel do Supabase deixam de ser usados.
+
 ## Contas e pagamento
 
 - Para reservar, a pessoa escolhe: **continuar como visitante**, **entrar** ou **criar conta** (a conta é criada junto com a reserva).
