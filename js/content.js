@@ -52,6 +52,7 @@
     whatsapp: "5511953063868",
     telefone: "(11) 95306-3868",
     email: "clinica.moradadoser@gmail.com",
+    email_avisos: "",
     endereco: "Rua Adolfo Torricelli, 284",
     bairro_cidade: "Vianelo, Jundiaí · SP",
     rodape: "Clínica Morada do Ser · Há mais de 30 anos, psicologia voltada para o desenvolvimento do humano."
@@ -110,6 +111,7 @@
       { key: "whatsapp", label: "WhatsApp (só números, com 55 e DDD)", type: "text" },
       { key: "telefone", label: "Telefone como aparece na página", type: "text" },
       { key: "email", label: "E-mail", type: "text" },
+      { key: "email_avisos", label: "E-mail que recebe o aviso de cada nova pré-reserva", type: "text", hint: "Se ficar vazio, o aviso vai para o e-mail acima." },
       { key: "endereco", label: "Endereço", type: "text" },
       { key: "bairro_cidade", label: "Bairro e cidade", type: "text" },
       { key: "rodape", label: "Texto do rodapé", type: "text" }

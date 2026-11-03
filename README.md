@@ -19,7 +19,7 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 ## Como colocar no ar
 
 1. **Supabase**: crie um projeto em supabase.com (plano grátis atende).
-   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql` e `supabase/006_novos_planos.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
+   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql` e `supabase/007_aviso_reserva.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
    - Deixe **Allow new users to sign up** e **Confirm email** ligados (clientes criam conta pelo site).
    - Configure um **SMTP próprio** em **Authentication → Emails → SMTP Settings** (ex.: Resend ou o Gmail da clínica com senha de app). O e-mail padrão do Supabase só envia para membros do projeto, então sem isso clientes não recebem a confirmação de cadastro nem o "esqueci minha senha".
    - Equipe: a primeira pessoa entra na tabela `staff` pelo SQL Editor:
@@ -47,6 +47,12 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 - Tudo é validado no banco (função `request_reservation`): horário de funcionamento, períodos, antecedência máxima de 3 meses, conflito de horário (com trava por sala, então duas pessoas não pegam o mesmo horário) e o **preço**, calculado com os valores do painel. O valor enviado pelo navegador é ignorado.
 - Limites contra abuso: no máximo 3 pré-reservas aguardando confirmação por CPF/telefone/conta e 20 pré-reservas por hora no site todo.
 - Visitantes nunca leem dados de outras reservas: só veem quais horas estão ocupadas (função `occupied_slots`).
+
+## Aviso de nova pré-reserva
+
+- Cada pré-reserva feita pelo site dispara um e-mail para a clínica (Edge Function `supabase/functions/avisar-reserva`, chamada pelo banco).
+- Em **Edge Functions → Secrets** no Supabase, cadastre `GMAIL_USER` (o Gmail que envia) e `GMAIL_APP_PASSWORD` (senha de app desse Gmail).
+- O destino é o campo "E-mail que recebe o aviso" em **Textos, preços e horários → Contato** (ou o e-mail de contato, se vazio).
 
 ## Contas e pagamento
 
