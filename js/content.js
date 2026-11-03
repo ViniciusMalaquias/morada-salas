@@ -28,7 +28,7 @@
     passos: [
       { titulo: "Escolha a sala", texto: "Veja as fotos e o que cada sala oferece." },
       { titulo: "Escolha o plano e os horários", texto: "Hora avulsa, horas antecipadas do mês ou período de 4h. Só aparecem os horários livres." },
-      { titulo: "A clínica confirma", texto: "Sua pré-reserva segura o horário e a clínica confirma pelo WhatsApp." },
+      { titulo: "A clínica confirma", texto: "Sua pré-reserva segura o horário e a clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento." },
       { titulo: "Atenda e acerte", texto: "Hora avulsa e período são pagos no dia; horas antecipadas, até o dia 05 do mês." }
     ],
     regras: [

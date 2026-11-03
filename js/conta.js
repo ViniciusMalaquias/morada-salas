@@ -299,7 +299,7 @@
       ${steps(st, r)}
       <ul class="myres-slots">${(lines.length ? lines : ["Horários a combinar com a clínica"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       ${r.total ? `<p class="small muted">Valor: <b>${M.money(r.total)}</b>${!r.payments ? "" : M.dueOf(r) === 0 ? " · pago" : M.paidOf(r) > 0 ? ` · pago ${M.money(M.paidOf(r))}, falta ${M.money(M.dueOf(r))}` : ` · pagamento ${M.dueText(r)}`}</p>` : ""}
-      ${st === "pendente" ? `<p class="muted small">O horário já está separado para você. A clínica confirma pelo WhatsApp.</p>` : ""}
+      ${st === "pendente" ? `<p class="muted small">O horário já está separado para você. A clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento.</p>` : ""}
       ${acts.trim() ? `<div class="myres-actions">${acts}</div>` : ""}
     </article>`;
   }

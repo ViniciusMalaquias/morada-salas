@@ -359,7 +359,7 @@
     const forma = document.querySelector('input[name="forma"]:checked')?.value || "pix";
     const pixPl = forma === "pix" && C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code }) : "";
     $("#done-pay").innerHTML = `
-      <p>Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
+      <p>Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp, em até 2 horas no horário de funcionamento. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
       ${forma === "link"
         ? `<p><b>Pagamento com cartão de crédito:</b> a clínica vai entrar em contato pelo WhatsApp para enviar o link de pagamento.</p>`
         : pixPl ? `<div class="pix-done"><div class="qr" data-qr="${esc(pixPl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pixPl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pixPl)}">Copiar</button></div></div></div>
