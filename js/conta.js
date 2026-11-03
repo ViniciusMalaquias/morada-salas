@@ -125,7 +125,7 @@
     const box = $("#my-list");
     if (error) { box.innerHTML = `<p class="err">Não foi possível carregar suas reservas.</p>`; return; }
     mine = (data || []).map(r => ({ ...r, sala: r.rooms?.name, slots: r.reservation_slots }));
-    renderHero(); renderPend(); renderList(); renderPays();
+    renderHero(); renderPend(); renderList(); renderAgenda(); renderPays();
   }
 
   // próxima ocorrência de um horário
@@ -163,6 +163,78 @@
         <h2>${esc(r.sala)}</h2><p>${s.hora_ini}h às ${s.hora_fim}h · ${PLANO[r.plano] || ""}</p></div>
       <div class="hn-act"><a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Sobre minha reserva ${r.codigo} (${r.sala}), ${M.DOW_NAME[at.getDay()]} ${M.br(at)} às ${s.hora_ini}h:`)}">Falar com a clínica</a></div></div>`;
   }
+
+  // ---------- Minha agenda ----------
+  const pad2 = n => String(n).padStart(2, "0");
+  // horário de Brasília (UTC−3, sem horário de verão) → formato de calendário em UTC
+  const calUtc = (dateIso, h) => { const [y, m, d] = dateIso.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d, h + 3)); return `${t.getUTCFullYear()}${pad2(t.getUTCMonth() + 1)}${pad2(t.getUTCDate())}T${pad2(t.getUTCHours())}0000Z`; };
+  const rrule = s => s.freq === "semanal" ? "RRULE:FREQ=WEEKLY" : s.freq === "quinzenal" ? "RRULE:FREQ=WEEKLY;INTERVAL=2" : "";
+  const agActive = r => r.status === "confirmada" || M.statusOf(r, C) === "pendente";
+  const evTitle = r => `Atendimento · ${r.sala || "Sala"} (Morada do Ser)`;
+  const evPlace = () => `${C.endereco}, ${String(C.bairro_cidade || "").replace(" · ", ", ")}`;
+  const evDesc = r => `Reserva ${r.codigo} na Clínica Morada do Ser.${r.status !== "confirmada" ? " Aguardando pagamento." : ""}\nMinha conta: ${new URL("conta.html", location.href).href}`;
+  function gcalLink(r, s, dateIso) {
+    const q = new URLSearchParams({ action: "TEMPLATE", text: evTitle(r), dates: `${calUtc(dateIso, s.hora_ini)}/${calUtc(dateIso, s.hora_fim)}`, details: evDesc(r), location: evPlace(), ctz: "America/Sao_Paulo" });
+    if (rrule(s)) q.set("recur", rrule(s));
+    return "https://calendar.google.com/calendar/render?" + q.toString();
+  }
+  // ocorrências de um horário entre duas datas
+  function occBetween(s, from, to) {
+    const start = M.parse(s.data), out = [];
+    if (s.freq === "unica") return start >= from && start <= to ? [start] : out;
+    const step = s.freq === "quinzenal" ? 14 : 7;
+    let d = start;
+    if (d < from) { const k = Math.ceil(Math.round((from - start) / 864e5) / step); d = M.addDays(start, k * step); }
+    for (; d <= to; d = M.addDays(d, step)) out.push(d);
+    return out;
+  }
+  function renderAgenda() {
+    const now = new Date(), from = new Date(now.getFullYear(), now.getMonth(), now.getDate()), to = M.addDays(from, 55);
+    const ev = mine.filter(agActive).flatMap(r => (r.slots || []).flatMap(s => occBetween(s, from, to)
+      .map(d => ({ r, s, d, at: new Date(d.getFullYear(), d.getMonth(), d.getDate(), s.hora_fim)}))))
+      .filter(x => x.at > now).sort((a, b) => a.d - b.d || a.s.hora_ini - b.s.hora_ini);
+    $("#ag-ics").hidden = !ev.length;
+    if (!ev.length) {
+      $("#ag-list").innerHTML = `<div class="card empty"><p>Nenhum horário marcado nas próximas semanas.</p><a class="btn small" href="index.html#salas">Reservar uma sala</a></div>`;
+      return;
+    }
+    let html = "", lastKey = "";
+    ev.forEach(({ r, s, d }) => {
+      const key = M.iso(d);
+      if (key !== lastKey) {
+        if (lastKey) html += `</div>`;
+        const rel = Math.round((d - from) / 864e5);
+        html += `<div class="ag-day"><h3>${M.DOW_LONG[d.getDay()].replace(/^./, c => c.toUpperCase())}, ${d.getDate()} de ${MESES[d.getMonth()]}${rel === 0 ? " · hoje" : rel === 1 ? " · amanhã" : ""}</h3>`;
+        lastKey = key;
+      }
+      const pend = r.status !== "confirmada";
+      html += `<div class="ag-item${pend ? " pend" : ""}">
+        <span class="ag-time">${s.hora_ini}h<small>${s.hora_fim}h</small></span>
+        <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[PLANO[r.plano], s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando pagamento" : ""].filter(Boolean).join(" · ")}</small></span>
+        <a class="linkbtn ag-g" target="_blank" rel="noopener" href="${esc(gcalLink(r, s, s.freq === "unica" ? s.data : M.iso(d)))}" title="${s.freq !== "unica" ? "Adiciona a série inteira" : "Adiciona este horário"}">+ Google Agenda</a>
+      </div>`;
+    });
+    $("#ag-list").innerHTML = html + `</div>`;
+  }
+  function downloadIcs() {
+    const esc2 = t => String(t).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Morada do Ser//Salas//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Morada do Ser"];
+    mine.filter(agActive).forEach(r => (r.slots || []).forEach((s, i) => {
+      lines.push("BEGIN:VEVENT", `UID:${r.id}-${i}@moradadoser`, `DTSTAMP:${stamp}`,
+        `DTSTART:${calUtc(s.data, s.hora_ini)}`, `DTEND:${calUtc(s.data, s.hora_fim)}`);
+      if (rrule(s)) lines.push(rrule(s));
+      lines.push(`SUMMARY:${esc2(evTitle(r))}`, `LOCATION:${esc2(evPlace())}`, `DESCRIPTION:${esc2(evDesc(r))}`,
+        "BEGIN:VALARM", "TRIGGER:-PT1H", "ACTION:DISPLAY", `DESCRIPTION:${esc2(evTitle(r))}`, "END:VALARM", "END:VEVENT");
+    }));
+    lines.push("END:VCALENDAR");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" }));
+    a.download = "morada-do-ser-agenda.ics"; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    toast("Arquivo baixado. Abra-o para adicionar os horários ao seu calendário.");
+  }
+  $("#ag-ics").addEventListener("click", downloadIcs);
 
   function renderPend() {
     const pend = mine.filter(r => M.statusOf(r, C) === "pendente");
