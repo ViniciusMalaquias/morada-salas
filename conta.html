@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611031536">
-<link rel="stylesheet" href="css/conta.css?v=202611031536">
+<link rel="stylesheet" href="css/style.css?v=202611031618">
+<link rel="stylesheet" href="css/conta.css?v=202611031618">
 </head>
 <body>
 <header class="top">
@@ -54,6 +54,7 @@
           <div class="field"><label for="s-email">E-mail</label><input id="s-email" type="email" autocomplete="email" required></div>
           <div class="field"><label for="s-pass">Senha (mínimo 8 caracteres)</label><input id="s-pass" type="password" autocomplete="new-password" minlength="8" required></div>
           <p class="err" id="s-err" hidden></p>
+          <p class="muted small">Ao criar a conta, você concorda com os <a href="termos.html#termos" target="_blank" rel="noopener">termos de uso</a> e a <a href="termos.html#privacidade" target="_blank" rel="noopener">política de privacidade</a>.</p>
           <button class="btn" type="submit">Criar conta</button>
         </form>
         <p class="ok" id="s-ok" hidden></p>
@@ -162,14 +163,14 @@
 <footer>
   <div class="wrap">
     <span data-c="rodape"></span>
-    <a href="admin.html">Área da equipe</a>
+    <span class="foot-links"><a href="termos.html">Termos e privacidade</a> · <a href="admin.html">Área da equipe</a></span>
   </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611031536"></script>
+<script src="js/config.js?v=202611031618"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/content.js?v=202611031536"></script>
-<script src="js/conta.js?v=202611031536"></script>
+<script src="js/content.js?v=202611031618"></script>
+<script src="js/conta.js?v=202611031618"></script>
 </body>
 </html>

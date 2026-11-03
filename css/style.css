@@ -157,3 +157,18 @@ a.room-main:hover img{transform:scale(1.03)}
 .room h3 a:hover{color:var(--accent)}
 .room-body .btn-res{align-self:stretch;margin-top:auto;padding:.9em 1.2em;font-size:.98rem}
 .btn-res svg{width:1.1em;height:1.1em}
+
+/* Termos e privacidade */
+.legal{max-width:760px;padding-block:48px 72px}
+.legal h1{font-family:var(--display);font-weight:400;font-size:clamp(2rem,5vw,2.8rem);line-height:1.15;margin:.3em 0 .4em}
+.legal .lead{color:var(--muted);font-size:1.08rem}
+.legal section{padding-block:28px 0;border-top:1px solid var(--line);margin-top:32px}
+.legal h2{font-family:var(--display);font-weight:400;font-size:1.7rem;margin:0 0 .4em}
+.legal h3{font-family:var(--body);font-weight:600;font-size:1.02rem;margin:1.6em 0 .4em}
+.legal p,.legal li{color:var(--ink)}
+.legal ul{padding-left:1.2em;margin:.4em 0}
+.legal li{margin:.35em 0}
+.legal a{color:var(--accent)}
+.legal-toc{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:16px}
+.legal-toc a{font-weight:600}
+.legal section{scroll-margin-top:90px}
