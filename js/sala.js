@@ -80,8 +80,8 @@
   }));
   startInput.addEventListener("change", () => { if (startInput.value < todayIso) startInput.value = todayIso;
     if (startInput.value > startInput.max) startInput.value = startInput.max; sel.clear(); occ = {}; refresh(); });
-  $("#wk-prev").onclick = () => { week = M.addDays(week, -7); refresh(); };
-  $("#wk-next").onclick = () => { week = M.addDays(week, 7); refresh(); };
+  $("#wk-prev").onclick = () => { week = M.addDays(week, -7); dayKey = null; refresh(); };
+  $("#wk-next").onclick = () => { week = M.addDays(week, 7); dayKey = null; refresh(); };
 
   // ---------- ocupação ----------
   async function loadOcc() {
@@ -130,9 +130,35 @@
   }
   const LBL = { free: "Livre", sel: "Escolhido", busy: "Ocupado", past: "", closed: "" };
 
+  // no celular: um dia por vez, com seletor de dias em cima
+  const mq = matchMedia("(max-width: 640px)");
+  let dayKey = null;
+  mq.addEventListener("change", () => drawCal());
+  function colInfo(c) {
+    const m = mode(); let free = 0, open = 0;
+    const count = st => { if (st === "free") free++; if (st !== "past" && st !== "closed") open++; };
+    if (m === "periodo") P.forEach((p, pi) => count(statePeriod(c, pi)));
+    else for (let h = minH; h < maxH; h++) count(stateHour(c, h));
+    const picked = [...sel].filter(k => k.startsWith(c.key + "|")).length;
+    return { free, picked, past: open === 0 };
+  }
+  function drawDayPick(cols) {
+    const box = $("#daypick");
+    if (!mq.matches || loading) { box.hidden = true; return cols; }
+    const info = cols.map(colInfo);
+    if (!cols.some(c => c.key === dayKey)) { const i = info.findIndex(x => x.free > 0); dayKey = cols[Math.max(0, i)]?.key ?? null; }
+    box.hidden = false;
+    box.innerHTML = cols.map((c, i) => `<button type="button" role="tab" data-day="${esc(c.key)}" aria-selected="${c.key === dayKey}" class="${info[i].free ? "" : "full"}">
+      <b>${c.label}</b>${c.sub ? `<small>${c.sub}</small>` : ""}<span>${info[i].picked ? `✓ ${info[i].picked}` : info[i].free ? `${info[i].free} livre${info[i].free > 1 ? "s" : ""}` : info[i].past ? "encerrado" : "lotado"}</span></button>`).join("");
+    box.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+    return cols.filter(c => c.key === dayKey);
+  }
+  $("#daypick").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (!b) return; dayKey = b.dataset.day; drawCal(); });
+
   function drawCal() {
     const cal = $("#cal"), m = mode(); if (!m) return;
-    const cols = columns();
+    const cols = drawDayPick(columns());
+    const one = mq.matches && cols.length === 1;
     $("#wk-label").textContent = `${M.br(week)} a ${M.br(M.addDays(week, 6))}`;
     $("#wk-prev").disabled = week <= firstWeek;
     $("#wk-next").disabled = week >= lastWeek;
@@ -141,23 +167,25 @@
     if (m === "periodo") {
       P.forEach((p, pi) => {
         html += `<tr><th scope="row">${esc(p.nome)}<small>${p.ini}h–${p.fim}h</small></th>`;
-        cols.forEach(c => { const st = statePeriod(c, pi); html += cell(st, `${c.key}|${pi}`, `${c.label} ${c.sub}, ${p.nome}`); });
+        cols.forEach(c => { const st = statePeriod(c, pi); html += cell(st, `${c.key}|${pi}`, `${c.label} ${c.sub}, ${p.nome}`, one); });
         html += `</tr>`;
       });
     } else {
       for (let h = minH; h < maxH; h++) {
         html += `<tr><th scope="row">${h}h</th>`;
-        cols.forEach(c => { const st = stateHour(c, h); html += cell(st, `${c.key}|${h}`, `${c.label} ${c.sub} às ${h}h`); });
+        cols.forEach(c => { const st = stateHour(c, h); html += cell(st, `${c.key}|${h}`, `${c.label} ${c.sub} às ${h}h`, one); });
         html += `</tr>`;
       }
     }
     cal.innerHTML = html + "</tbody>";
     cal.classList.toggle("periods", m === "periodo");
+    cal.classList.toggle("one", one);
   }
-  function cell(st, key, label) {
+  function cell(st, key, label, wide) {
     if (st === "closed") return `<td class="c-closed"></td>`;
     const can = st === "free" || st === "sel";
-    return `<td><button type="button" class="cell ${st}" data-k="${esc(key)}" ${can ? "" : "disabled"} aria-pressed="${st === "sel"}" aria-label="${esc(label)}: ${LBL[st] || "indisponível"}">${st === "busy" ? "Ocupado" : st === "sel" ? "✓" : ""}</button></td>`;
+    const txt = wide ? ({ free: "Livre", sel: "✓ Escolhido", busy: "Ocupado", past: "Já passou" }[st] || "") : st === "busy" ? "Ocupado" : st === "sel" ? "✓" : "";
+    return `<td><button type="button" class="cell ${st}" data-k="${esc(key)}" ${can ? "" : "disabled"} aria-pressed="${st === "sel"}" aria-label="${esc(label)}: ${LBL[st] || "indisponível"}">${txt}</button></td>`;
   }
   $("#cal").addEventListener("click", e => {
     const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
