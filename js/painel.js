@@ -39,8 +39,8 @@
 
   function fmtSlot(s) {
     const d = M.parse(s.data);
-    if (s.freq === "unica") return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}, ${s.hora_ini}h–${s.hora_fim}h`;
-    return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${s.hora_ini}h–${s.hora_fim}h (desde ${M.br(d)})`;
+    if (s.freq === "unica") return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}, ${M.hh(s.hora_ini)}–${M.hh(s.hora_fim)}`;
+    return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${M.hh(s.hora_ini)}–${M.hh(s.hora_fim)} (desde ${M.br(d)})`;
   }
   const slotsText = r => (r.reservation_slots || []).slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot);
 
@@ -155,16 +155,17 @@
     $("#kpis").innerHTML = [
       kpi("Aguardando confirmação", pend.length, pend.length ? "pré-reservas para confirmar" : "Nada pendente", "reservas", pend.length ? "warn" : ""),
       kpi(`Recebido em ${MESES[now.getMonth()]}`, M.money(recMes), "pagamentos registrados", "financeiro"),
-      kpi("Atendimentos hoje", ev.length, ev.length ? `${ev.reduce((s, x) => s + x.s.hora_fim - x.s.hora_ini, 0)}h reservadas` : "Agenda livre", "agenda"),
-      kpi("Ocupação da semana", `${tot[1] ? Math.round(tot[0] / tot[1] * 100) : 0}%`, `${tot[0]}h de ${tot[1]}h disponíveis`, "agenda"),
+      kpi("Atendimentos hoje", ev.length, ev.length ? `${M.dur(ev.reduce((s, x) => s + x.s.hora_fim - x.s.hora_ini, 0))} reservadas` : "Agenda livre", "agenda"),
+      kpi("Ocupação da semana", `${tot[1] ? Math.round(tot[0] / tot[1] * 100) : 0}%`, `${M.dur(tot[0])} de ${M.dur(tot[1])} disponíveis`, "agenda"),
       kpi("A receber", M.money(rec.reduce((t, r) => t + M.dueOf(r), 0)), late.length ? `${late.length} pagamento(s) atrasado(s)` : `${rec.length} reserva(s) confirmada(s)`, "financeiro", late.length ? "warn" : "")
     ].join("");
     $$("#kpis [data-go]").forEach(k => k.onclick = () => A().go(k.dataset.go));
 
     $("#today-label").textContent = `${M.DOW_LONG[now.getDay()]}, ${M.br(now)}`;
+    const nowDec = now.getHours() + now.getMinutes() / 60;
     $("#today-list").innerHTML = ev.length ? ev.map(({ r, s }) => `
-      <button type="button" class="tl-item ${s.hora_fim <= now.getHours() ? "past" : s.hora_ini <= now.getHours() ? "now" : ""}" data-open-res="${r.id}">
-        <span class="tl-time">${s.hora_ini}h<small>${s.hora_fim}h</small></span>
+      <button type="button" class="tl-item ${s.hora_fim <= nowDec ? "past" : s.hora_ini <= nowDec ? "now" : ""}" data-open-res="${r.id}">
+        <span class="tl-time">${M.hh(s.hora_ini)}<small>${M.hh(s.hora_fim)}</small></span>
         <span class="tl-body"><b>${esc(r.nome)}</b><small>${esc(roomName(s.room_id))} · ${PLANO[r.plano]}</small></span>${pill(r)}</button>`).join("")
       : `<p class="empty-s">Nenhum atendimento hoje.</p>`;
 
@@ -205,23 +206,24 @@
     if (!cols.length || !opens.length) { grid.style.gridTemplateColumns = ""; grid.innerHTML = `<p class="empty-s">${agView === "dia" ? "A clínica não abre neste dia." : "Nenhuma sala cadastrada."}</p>`; return; }
     const h0 = Math.min(...opens.map(o => o[0])), h1 = Math.max(...opens.map(o => o[1]));
     grid.style.gridTemplateColumns = `52px repeat(${cols.length}, minmax(120px, 1fr))`;
-    grid.style.gridTemplateRows = `auto repeat(${h1 - h0}, 52px)`;
+    grid.style.gridTemplateRows = `auto repeat(${(h1 - h0) * 2}, 27px)`;
+    const row = t => Math.round((t - h0) * 2) + 2;
     const now = new Date();
     let html = `<div class="cg-corner"></div>` + cols.map((c, i) => `<div class="cg-head ${M.iso(c.date) === todayIso() && agView === "semana" ? "today" : ""}" style="grid-column:${i + 2}">${esc(c.label)}</div>`).join("");
-    for (let h = h0; h < h1; h++) html += `<div class="cg-hour" style="grid-row:${h - h0 + 2}">${h}h</div>`;
+    for (let h = h0; h < h1; h++) html += `<div class="cg-hour" style="grid-row:${row(h)} / span 2">${h}h</div>`;
     cols.forEach((c, i) => {
       const o = openOf(c.date);
-      for (let h = h0; h < h1; h++) {
+      for (let h = h0; h < h1; h += 0.5) {
         const closed = !o || h < o[0] || h >= o[1];
-        const past = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate(), h + 1) < now;
-        html += closed ? `<div class="cg-cell closed" style="grid-column:${i + 2};grid-row:${h - h0 + 2}"></div>`
-          : `<button type="button" class="cg-cell ${past ? "past" : ""}" style="grid-column:${i + 2};grid-row:${h - h0 + 2}" data-new data-room="${c.room}" data-date="${M.iso(c.date)}" data-h="${h}" aria-label="Criar reserva ${c.label} às ${h}h"><span>+</span></button>`;
+        const past = new Date(c.date.getFullYear(), c.date.getMonth(), c.date.getDate(), Math.floor(h), (h % 1) * 60 + 30) < now;
+        html += closed ? `<div class="cg-cell closed ${h % 1 ? "half" : ""}" style="grid-column:${i + 2};grid-row:${row(h)}"></div>`
+          : `<button type="button" class="cg-cell ${past ? "past" : ""} ${h % 1 ? "half" : ""}" style="grid-column:${i + 2};grid-row:${row(h)}" data-new data-room="${c.room}" data-date="${M.iso(c.date)}" data-h="${h}" aria-label="Criar reserva ${c.label} às ${M.hh(h)}"><span>+</span></button>`;
       }
       dayEvents(c.date, c.room).forEach(({ r, s }) => {
         const cls = r.plano === "bloqueio" ? "blk" : st(r) === "pendente" ? "pend" : "conf";
-        const a = Math.max(s.hora_ini, h0), b = Math.min(s.hora_fim, h1); if (b <= a) return;
-        html += `<button type="button" class="cg-ev ${cls}" style="grid-column:${i + 2};grid-row:${a - h0 + 2} / ${b - h0 + 2}" data-res="${r.id}">
-          <b>${esc(r.plano === "bloqueio" ? r.nome : first(r.nome) + " " + (r.nome.split(" ").slice(-1)[0] || ""))}</b><small>${s.hora_ini}h–${s.hora_fim}h · ${PLANO[r.plano]}</small></button>`;
+        const a = Math.max(Number(s.hora_ini), h0), b = Math.min(Number(s.hora_fim), h1); if (b <= a) return;
+        html += `<button type="button" class="cg-ev ${cls} ${b - a <= 0.5 ? "short" : ""}" style="grid-column:${i + 2};grid-row:${row(a)} / ${row(b)}" data-res="${r.id}">
+          <b>${esc(r.plano === "bloqueio" ? r.nome : first(r.nome) + " " + (r.nome.split(" ").slice(-1)[0] || ""))}</b><small>${M.hh(s.hora_ini)}–${M.hh(s.hora_fim)} · ${PLANO[r.plano]}</small></button>`;
       });
     });
     grid.innerHTML = html;
@@ -523,15 +525,15 @@
   // nova reserva / bloqueio a partir da agenda
   function openNew(roomId, date, h) {
     const d = M.parse(date), o = openOf(d) || [h, h + 1];
-    const hopt = (sel, from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i).map(x => `<option value="${x}" ${x === sel ? "selected" : ""}>${x}h</option>`).join("");
+    const hopt = (sel, from, to) => Array.from({ length: Math.round((to - from) * 2) + 1 }, (_, i) => from + i / 2).map(x => `<option value="${x}" ${x === sel ? "selected" : ""}>${M.hh(x)}</option>`).join("");
     openDrawer("Novo horário", `
       <div class="seg-a" role="tablist"><button type="button" data-k="res" aria-pressed="true">Reserva de cliente</button><button type="button" data-k="blk" aria-pressed="false">Bloquear (uso da clínica)</button></div>
       <form id="nf" class="dr-payform" novalidate>
         <div class="grid-f">
           <div class="field"><label for="nf-sala">Sala</label><select id="nf-sala">${rooms.map(r => `<option value="${r.id}" ${r.id === roomId ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
           <div class="field"><label for="nf-data">Data</label><input id="nf-data" type="date" value="${date}"></div>
-          <div class="field"><label for="nf-ini">Das</label><select id="nf-ini">${hopt(h, o[0], o[1] - 1)}</select></div>
-          <div class="field"><label for="nf-fim">Até</label><select id="nf-fim">${hopt(h + 1, o[0] + 1, o[1])}</select></div>
+          <div class="field"><label for="nf-ini">Das</label><select id="nf-ini">${hopt(h, o[0], o[1] - 0.5)}</select></div>
+          <div class="field"><label for="nf-fim">Até</label><select id="nf-fim">${hopt(Math.min(h + 1, o[1]), o[0] + 0.5, o[1])}</select></div>
           <div class="field wide"><label for="nf-freq">Repetir</label><select id="nf-freq"><option value="unica">Não repetir</option><option value="semanal">Toda semana</option><option value="quinzenal">A cada 15 dias</option></select></div>
         </div>
         <div id="nf-res" class="grid-f">

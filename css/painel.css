@@ -212,3 +212,8 @@ body.noscroll{overflow:hidden}
   .dl{grid-template-columns:84px 1fr}
   .grid-f{grid-template-columns:minmax(0,1fr)}
 }
+
+/* agenda de 30 em 30 minutos */
+.cg-cell.half{border-top-style:dashed}
+.cg-ev.short{padding:2px 8px;flex-direction:row;gap:6px;align-items:center;font-size:.76rem}
+.cg-ev.short small{white-space:nowrap}

@@ -19,7 +19,7 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 ## Como colocar no ar
 
 1. **Supabase**: crie um projeto em supabase.com (plano grátis atende).
-   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql`, `supabase/008_forma_pagamento.sql` e `supabase/009_emails_cliente.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
+   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql`, `supabase/008_forma_pagamento.sql`, `supabase/009_emails_cliente.sql` e `supabase/010_meia_hora.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
    - Deixe **Allow new users to sign up** e **Confirm email** ligados (clientes criam conta pelo site).
    - Configure um **SMTP próprio** em **Authentication → Emails → SMTP Settings** (ex.: Resend ou o Gmail da clínica com senha de app). O e-mail padrão do Supabase só envia para membros do projeto, então sem isso clientes não recebem a confirmação de cadastro nem o "esqueci minha senha".
    - Equipe: a primeira pessoa entra na tabela `staff` pelo SQL Editor:
@@ -42,6 +42,7 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 
 ## Reservas
 
+- Horários de **30 em 30 minutos** (ex.: 14h30 às 15h ou às 16h30); meia hora custa metade da hora. No calendário, tocar no início e no último quadrinho marca o intervalo.
 - Planos: **hora avulsa** (R$ 38/h, paga no dia), **horas antecipadas** (R$ 28/h, mínimo de 4h no mesmo mês, acerto até o dia 05; horas não usadas não acumulam) e **período de 4h** (R$ 90; manhã 8–12, tarde 13–17, noite 17–21). Valores editáveis no painel.
 - O site só mostra horários livres. A pré-reserva fica **aguardando confirmação** e já segura o horário até a clínica confirmar ou recusar no painel (com mensagem pronta para o WhatsApp).
 - Tudo é validado no banco (função `request_reservation`): horário de funcionamento, períodos, antecedência máxima de 3 meses, conflito de horário (com trava por sala, então duas pessoas não pegam o mesmo horário) e o **preço**, calculado com os valores do painel. O valor enviado pelo navegador é ignorado.

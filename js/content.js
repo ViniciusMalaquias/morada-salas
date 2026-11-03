@@ -131,7 +131,7 @@
     const per = (C.periodos || []).map(p => `${p.nome} ${p.ini}h–${p.fim}h`).join(" · ");
     const perHora = C.preco_periodo_bloco / 4;
     return [
-      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: "Para quando precisar, sem compromisso. Pago no dia do atendimento.", off: 0 },
+      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(C.preco_avulso / 2)}), sem compromisso. Pago no dia do atendimento.`, off: 0 },
       { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês, todas no mesmo mês. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso) },
       { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso) }
     ];
@@ -193,18 +193,22 @@
   async function loadOccupied(roomId, from, to) {
     const map = {};
     if (!client) return map;
-    const { data, error } = await client.rpc("occupied_slots", { p_room: roomId, p_from: iso(from), p_to: iso(to) });
+    const { data, error } = await client.rpc("occupied_slots2", { p_room: roomId, p_from: iso(from), p_to: iso(to) });
     if (error) throw error;
-    (data || []).forEach(o => { const s = (map[o.data] ||= new Set()); for (let h = o.hora_ini; h < o.hora_fim; h++) s.add(h); });
+    (data || []).forEach(o => { const s = (map[o.data] ||= new Set()); for (let h = Number(o.hora_ini); h < Number(o.hora_fim); h += 0.5) s.add(h); });
     return map;
   }
 
-  // Junta horas seguidas em faixas: [14,15,17] -> [[14,16],[17,18]]
+  // Junta meias horas seguidas em faixas: [14,14.5,17] -> [[14,15],[17,17.5]]
   function ranges(hours) {
     const hs = [...hours].map(Number).sort((a, b) => a - b), out = [];
-    hs.forEach(h => { const last = out[out.length - 1]; if (last && last[1] === h) last[1] = h + 1; else out.push([h, h + 1]); });
+    hs.forEach(h => { const last = out[out.length - 1]; if (last && last[1] === h) last[1] = h + 0.5; else out.push([h, h + 0.5]); });
     return out;
   }
+  // 14 -> "14h", 14.5 -> "14h30"
+  const hh = h => { h = Number(h); const H = Math.floor(h), m = Math.round((h - H) * 60); return m ? `${H}h${pad(m)}` : `${H}h`; };
+  // duração: 1.5 -> "1h30", 0.5 -> "30 min"
+  const dur = h => { h = Number(h); const H = Math.floor(h), m = Math.round((h - H) * 60); return H ? (m ? `${H}h${pad(m)}` : `${H}h`) : `${m} min`; };
 
   // ---------- CPF ----------
   const onlyDigits = v => String(v || "").replace(/\D/g, "");
@@ -271,7 +275,7 @@
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
-    money, pct, plans, semanalRate, dueText, paidOf, dueOf, ranges, iso, parse, addDays, monday, br, pad,
+    money, pct, plans, semanalRate, dueText, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
     pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };

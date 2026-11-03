@@ -46,7 +46,7 @@
   const openDows = [1, 2, 3, 4, 5, 6, 0].filter(i => H[M.DOW_NAME[i]]);
   const minH = Math.min(...openDows.map(i => H[M.DOW_NAME[i]][0]));
   const maxH = Math.max(...openDows.map(i => H[M.DOW_NAME[i]][1]));
-  const now = new Date(), todayIso = M.iso(now), nowH = now.getHours();
+  const now = new Date(), todayIso = M.iso(now), nowH = now.getHours() + now.getMinutes() / 60;
   const firstWeek = M.monday(now), lastWeek = M.addDays(firstWeek, 7 * 12);
 
   let plan = null, week = firstWeek, sel = new Set(), occ = {}, loading = false;
@@ -71,8 +71,8 @@
     $("#weeknav").hidden = m === "fixo";
     $("#time-title").textContent = m === "fixo" ? "Escolha seus horários fixos" : m === "periodo" ? "Escolha os períodos" : "Escolha os horários";
     $("#time-hint").textContent =
-      plan === "avulso" ? "Toque nas horas que quer reservar. Cada hora comporta uma sessão de 50 minutos." :
-      plan === "pacote" ? `Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.` :
+      plan === "avulso" ? "Cada quadrinho é meia hora. Toque no horário de início e depois no último quadrinho: o intervalo é marcado sozinho." :
+      plan === "pacote" ? `Cada quadrinho é meia hora (toque no início e no fim para marcar o intervalo). Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.` :
       plan === "periodo" ? `Toque nos períodos que quer reservar. Cada período de 4h sai ${M.money(C.preco_periodo_bloco)}.` :
       plan === "semanal" ? "Toque nas horas que vão se repetir toda semana. Quanto mais horas por semana, menor o valor da hora." :
       "Toque nas horas que vão se repetir a cada 15 dias.";
@@ -125,7 +125,7 @@
     const p = P[pi], o = openOf(c.date);
     if (!o || p.ini < o[0] || p.fim > o[1]) return "closed";
     if (isPast(c.date, p.ini)) return "past";
-    for (let h = p.ini; h < p.fim; h++) if (occ[c.key]?.has(h)) return "busy";
+    for (let h = p.ini; h < p.fim; h += 0.5) if (occ[c.key]?.has(h)) return "busy";
     return sel.has(`${c.key}|${pi}`) ? "sel" : "free";
   }
   const LBL = { free: "Livre", sel: "Escolhido", busy: "Ocupado", past: "", closed: "" };
@@ -138,7 +138,7 @@
     const m = mode(); let free = 0, open = 0;
     const count = st => { if (st === "free") free++; if (st !== "past" && st !== "closed") open++; };
     if (m === "periodo") P.forEach((p, pi) => count(statePeriod(c, pi)));
-    else for (let h = minH; h < maxH; h++) count(stateHour(c, h));
+    else for (let h = minH; h < maxH; h += 0.5) count(stateHour(c, h));
     const picked = [...sel].filter(k => k.startsWith(c.key + "|")).length;
     return { free, picked, past: open === 0 };
   }
@@ -171,9 +171,10 @@
         html += `</tr>`;
       });
     } else {
-      for (let h = minH; h < maxH; h++) {
-        html += `<tr><th scope="row">${h}h</th>`;
-        cols.forEach(c => { const st = stateHour(c, h); html += cell(st, `${c.key}|${h}`, `${c.label} ${c.sub} às ${h}h`, one); });
+      for (let h = minH; h < maxH; h += 0.5) {
+        const half = h % 1 !== 0;
+        html += `<tr class="${half ? "half" : "full"}"><th scope="row">${half ? `<span class="hh">${M.hh(h)}</span>` : M.hh(h)}</th>`;
+        cols.forEach(c => { const st = stateHour(c, h); html += cell(st, `${c.key}|${h}`, `${c.label} ${c.sub}, das ${M.hh(h)} às ${M.hh(h + 0.5)}`, one); });
         html += `</tr>`;
       }
     }
@@ -197,9 +198,18 @@
         if (mes(k) !== first) return showErr("As horas antecipadas precisam ser todas no mesmo mês. Desmarque as do outro mês para escolher estas.");
       }
       sel.add(k);
+      // tocar no início e depois no fim preenche o intervalo (só horários livres, mesmo dia)
+      const [col, hs] = k.split("|"), h = +hs;
+      if (mode() === "hora" && lastTap && lastTap.col === col && h > lastTap.h + 0.5 && sel.has(`${col}|${lastTap.h}`)) {
+        const c = columns().find(x => x.key === col), gap = [];
+        for (let x = lastTap.h + 0.5; x < h; x += 0.5) gap.push(x);
+        if (c && gap.every(x => stateHour(c, x) === "free")) gap.forEach(x => sel.add(`${col}|${x}`));
+      }
+      lastTap = { col, h };
     }
     hideErr(); drawCal(); summary();
   });
+  let lastTap = null;
 
   async function refresh() { hideErr(); await loadOcc(); drawCal(); summary(); }
 
@@ -212,13 +222,13 @@
       const byDate = {};
       sel.forEach(k => { const [d, h] = k.split("|"); (byDate[d] ||= []).push(+h); });
       Object.keys(byDate).sort().forEach(d => {
-        M.ranges(byDate[d]).forEach(([a, b]) => { slots.push({ freq: "unica", data: d, hora_ini: a, hora_fim: b }); lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${a}h–${b}h`); });
+        M.ranges(byDate[d]).forEach(([a, b]) => { slots.push({ freq: "unica", data: d, hora_ini: a, hora_fim: b }); lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${M.hh(a)}–${M.hh(b)}`); });
       });
-      hours = sel.size;
-      if (plan === "avulso") { total = hours * C.preco_avulso; priceLines.push(`${hours}h × ${M.money(C.preco_avulso)}`, "Pago no dia do atendimento"); }
+      hours = sel.size / 2;
+      if (plan === "avulso") { total = hours * C.preco_avulso; priceLines.push(`${M.dur(hours)} × ${M.money(C.preco_avulso)}/h`, "Pago no dia do atendimento"); }
       else {
-        total = hours * C.preco_antecipada; priceLines.push(`${hours}h × ${M.money(C.preco_antecipada)}`);
-        if (hours < C.antecipadas_min) priceLines.push(`Faltam ${C.antecipadas_min - hours}h para o mínimo de ${C.antecipadas_min}h no mês.`);
+        total = hours * C.preco_antecipada; priceLines.push(`${M.dur(hours)} × ${M.money(C.preco_antecipada)}/h`);
+        if (hours < C.antecipadas_min) priceLines.push(`Faltam ${M.dur(C.antecipadas_min - hours)} para o mínimo de ${C.antecipadas_min}h no mês.`);
         else priceLines.push("Acerto até o dia 05 do mês");
       }
     } else if (m === "periodo") {
@@ -240,7 +250,7 @@
           lines.push(`${freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[dow]}, ${a}h–${b}h (a partir de ${M.br(first)})`);
         });
       });
-      hours = sel.size;
+      hours = sel.size / 2;
       const rate = freq === "semanal" ? M.semanalRate(C, hours) : C.preco_quinzenal;
       const perMonth = freq === "semanal" ? 4 : 2;
       total = hours * rate * perMonth;

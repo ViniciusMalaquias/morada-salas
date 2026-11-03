@@ -140,3 +140,10 @@ fieldset.forma legend{font-weight:600;font-size:.92rem;margin-bottom:8px;padding
 .forma-pick .pick input{position:absolute;opacity:0;pointer-events:none}
 .forma-pick small{color:var(--muted);font-size:.82rem;line-height:1.4}
 @media (max-width:560px){.forma-pick{grid-template-columns:1fr}}
+
+/* Grade de 30 em 30 minutos */
+.cal tr.full th[scope=row]{font-weight:600}
+.cal tr.half th[scope=row] .hh{font-weight:400;font-size:.72rem;color:var(--muted)}
+.cal:not(.one):not(.periods) .cell{height:22px}
+.cal:not(.one) tr.full td{padding-top:3px}
+.cal.one .cell{height:38px}

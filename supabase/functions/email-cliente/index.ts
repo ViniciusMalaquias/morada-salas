@@ -16,6 +16,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "
 const money = (v: unknown) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const pad = (n: number) => String(n).padStart(2, "0");
+const hh = (h: unknown) => { const n = Number(h), H = Math.floor(n), m = Math.round((n - H) * 60); return m ? `${H}h${String(m).padStart(2, "0")}` : `${H}h`; };
 const first = (n: string) => String(n || "").trim().split(/\s+/)[0] || "";
 
 // ---------- Pix copia e cola (mesmo formato do site) ----------
@@ -36,7 +37,7 @@ function pixPayload(chave: string, nome: string, cidade: string, valor: number, 
 function fmtSlot(s: any) {
   const [y, m, d] = s.data.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return `${DOW[dt.getUTCDay()]}, ${pad(d)}/${pad(m)}, das ${s.hora_ini}h às ${s.hora_fim}h`;
+  return `${DOW[dt.getUTCDay()]}, ${pad(d)}/${pad(m)}, das ${hh(s.hora_ini)} às ${hh(s.hora_fim)}`;
 }
 function dueText(r: any) {
   if (r.plano !== "pacote") return "no dia do atendimento";

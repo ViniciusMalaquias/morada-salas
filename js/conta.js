@@ -128,16 +128,17 @@
     renderHero(); renderPend(); renderList(); renderAgenda(); renderPays();
   }
 
+  const atH = (y, m, d, h) => new Date(y, m, d, Math.floor(h), Math.round((h % 1) * 60));
   // próxima ocorrência de um horário
   function nextOcc(s, from = new Date()) {
     const now = from, today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = M.parse(s.data);
-    if (s.freq === "unica") { const d = new Date(start.getFullYear(), start.getMonth(), start.getDate(), s.hora_ini); return d >= now ? d : null; }
+    if (s.freq === "unica") { const d = atH(start.getFullYear(), start.getMonth(), start.getDate(), Number(s.hora_ini)); return d >= now ? d : null; }
     let d = start > today ? start : today;
     for (let i = 0; i < 30; i++) {
       const diff = Math.round((d - start) / 864e5);
       if (d.getDay() === start.getDay() && diff >= 0 && (s.freq === "semanal" || (diff / 7) % 2 === 0)) {
-        const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), s.hora_ini);
+        const at = atH(d.getFullYear(), d.getMonth(), d.getDate(), Number(s.hora_ini));
         if (at >= now) return at;
       }
       d = M.addDays(d, 1);
@@ -160,14 +161,14 @@
     $("#hero-next").innerHTML = `<div class="hero-next">
       <div class="hn-date"><span>${M.DOW_NAME[at.getDay()]}</span><strong>${at.getDate()}</strong><span>${MESES[at.getMonth()].slice(0, 3)}</span></div>
       <div class="hn-body"><span class="eyebrow">Próximo atendimento · ${relDay(at)}</span>
-        <h2>${esc(r.sala)}</h2><p>${s.hora_ini}h às ${s.hora_fim}h · ${PLANO[r.plano] || ""}</p></div>
-      <div class="hn-act"><a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Sobre minha reserva ${r.codigo} (${r.sala}), ${M.DOW_NAME[at.getDay()]} ${M.br(at)} às ${s.hora_ini}h:`)}">Falar com a clínica</a></div></div>`;
+        <h2>${esc(r.sala)}</h2><p>${M.hh(s.hora_ini)} às ${M.hh(s.hora_fim)} · ${PLANO[r.plano] || ""}</p></div>
+      <div class="hn-act"><a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Sobre minha reserva ${r.codigo} (${r.sala}), ${M.DOW_NAME[at.getDay()]} ${M.br(at)} às ${M.hh(s.hora_ini)}:`)}">Falar com a clínica</a></div></div>`;
   }
 
   // ---------- Minha agenda ----------
   const pad2 = n => String(n).padStart(2, "0");
   // horário de Brasília (UTC−3, sem horário de verão) → formato de calendário em UTC
-  const calUtc = (dateIso, h) => { const [y, m, d] = dateIso.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d, h + 3)); return `${t.getUTCFullYear()}${pad2(t.getUTCMonth() + 1)}${pad2(t.getUTCDate())}T${pad2(t.getUTCHours())}0000Z`; };
+  const calUtc = (dateIso, h) => { h = Number(h); const [y, m, d] = dateIso.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d, Math.floor(h) + 3, Math.round((h % 1) * 60))); return `${t.getUTCFullYear()}${pad2(t.getUTCMonth() + 1)}${pad2(t.getUTCDate())}T${pad2(t.getUTCHours())}${pad2(t.getUTCMinutes())}00Z`; };
   const rrule = s => s.freq === "semanal" ? "RRULE:FREQ=WEEKLY" : s.freq === "quinzenal" ? "RRULE:FREQ=WEEKLY;INTERVAL=2" : "";
   const agActive = r => r.status === "confirmada" || M.statusOf(r, C) === "pendente";
   const evTitle = r => `Atendimento · ${r.sala || "Sala"} (Morada do Ser)`;
@@ -191,7 +192,7 @@
   function renderAgenda() {
     const now = new Date(), from = new Date(now.getFullYear(), now.getMonth(), now.getDate()), to = M.addDays(from, 55);
     const ev = mine.filter(agActive).flatMap(r => (r.slots || []).flatMap(s => occBetween(s, from, to)
-      .map(d => ({ r, s, d, at: new Date(d.getFullYear(), d.getMonth(), d.getDate(), s.hora_fim)}))))
+      .map(d => ({ r, s, d, at: atH(d.getFullYear(), d.getMonth(), d.getDate(), Number(s.hora_fim))}))))
       .filter(x => x.at > now).sort((a, b) => a.d - b.d || a.s.hora_ini - b.s.hora_ini);
     $("#ag-ics").hidden = !ev.length;
     if (!ev.length) {
@@ -209,7 +210,7 @@
       }
       const pend = r.status !== "confirmada";
       html += `<div class="ag-item${pend ? " pend" : ""}">
-        <span class="ag-time">${s.hora_ini}h<small>${s.hora_fim}h</small></span>
+        <span class="ag-time">${M.hh(s.hora_ini)}<small>${M.hh(s.hora_fim)}</small></span>
         <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[PLANO[r.plano], s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando confirmação" : ""].filter(Boolean).join(" · ")}</small></span>
         <a class="linkbtn ag-g" target="_blank" rel="noopener" href="${esc(gcalLink(r, s, s.freq === "unica" ? s.data : M.iso(d)))}" title="${s.freq !== "unica" ? "Adiciona a série inteira" : "Adiciona este horário"}">+ Google Agenda</a>
       </div>`;
@@ -275,8 +276,8 @@
 
   function fmtSlot(s) {
     const d = M.parse(s.data);
-    if (s.freq === "unica") return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}, ${s.hora_ini}h–${s.hora_fim}h`;
-    return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${s.hora_ini}h–${s.hora_fim}h (desde ${M.br(d)})`;
+    if (s.freq === "unica") return `${M.DOW_NAME[d.getDay()]} ${M.br(d)}, ${M.hh(s.hora_ini)}–${M.hh(s.hora_fim)}`;
+    return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${M.hh(s.hora_ini)}–${M.hh(s.hora_fim)} (desde ${M.br(d)})`;
   }
 
   function steps(st, r) {

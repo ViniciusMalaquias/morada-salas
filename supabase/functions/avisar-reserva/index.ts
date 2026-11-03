@@ -10,6 +10,7 @@ const PLANO: Record<string, string> = { avulso: "Hora avulsa", pacote: "Horas an
 const SITE = "https://viniciusmalaquias.github.io/morada-salas/";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const money = (v: unknown) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const hh = (h: unknown) => { const n = Number(h), H = Math.floor(n), m = Math.round((n - H) * 60); return m ? `${H}h${String(m).padStart(2, "0")}` : `${H}h`; };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
   const to = get("email_avisos") || get("email") || "clinica.moradadoser@gmail.com";
 
   const slots = (r.reservation_slots || []).slice().sort((a: any, b: any) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini)
-    .map((s: any) => { const [y, m, d] = s.data.split("-").map(Number); const dt = new Date(Date.UTC(y, m - 1, d)); return `${DOW[dt.getUTCDay()]} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}, ${s.hora_ini}h–${s.hora_fim}h`; });
+    .map((s: any) => { const [y, m, d] = s.data.split("-").map(Number); const dt = new Date(Date.UTC(y, m - 1, d)); return `${DOW[dt.getUTCDay()]} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}, ${hh(s.hora_ini)}–${hh(s.hora_fim)}`; });
   const sala = (r as any).rooms?.name || "Sala";
   let tel = String(r.telefone || "").replace(/\D/g, ""); if (tel.length === 10 || tel.length === 11) tel = "55" + tel;
   const row = (k: string, v: string) => `<tr><td style="padding:6px 12px 6px 0;color:#8a7f79;white-space:nowrap;vertical-align:top">${k}</td><td style="padding:6px 0;color:#38312e">${v}</td></tr>`;
