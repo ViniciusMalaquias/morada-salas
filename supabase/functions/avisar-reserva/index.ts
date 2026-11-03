@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: r } = await sb.from("reservations")
-    .select("id,codigo,nome,telefone,email,profissao,registro,obs,plano,total,created_at,avisado_em,aceite_em,rooms(name),reservation_slots(data,hora_ini,hora_fim)")
+    .select("id,codigo,nome,telefone,email,profissao,registro,obs,plano,total,forma_escolhida,created_at,avisado_em,aceite_em,rooms(name),reservation_slots(data,hora_ini,hora_fim)")
     .eq("id", id).maybeSingle();
   if (!r || r.avisado_em || !r.aceite_em || Date.now() - new Date(r.created_at).getTime() > 15 * 60e3) return json({ ok: true, skipped: true });
 
@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
       ${row("Plano", esc(PLANO[r.plano] || r.plano))}
       ${row("Horários", slots.map(esc).join("<br>") || "—")}
       ${row("Valor", `<b>${money(r.total)}</b>`)}
+      ${row("Pagamento", r.forma_escolhida === "link" ? "<b>Cartão de crédito</b> · enviar o link pelo WhatsApp" : "Pix")}
       ${row("Telefone", esc(r.telefone))}
       ${row("E-mail", esc(r.email))}
       ${row("Profissão", esc([r.profissao, r.registro].filter(Boolean).join(" · ") || "—"))}
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
     await tr.sendMail({
       from: `"Salas Morada do Ser" <${user}>`, to, replyTo: r.email || undefined,
       subject: `Nova pré-reserva: ${r.nome} · ${sala} · ${slots[0] || ""}`,
-      text: `Nova pré-reserva aguardando confirmação\n${r.nome} · ${sala}\n${PLANO[r.plano] || r.plano}\n${slots.join("\n")}\nValor: ${money(r.total)}\nTelefone: ${r.telefone}\nE-mail: ${r.email}\nCódigo: ${r.codigo}\n\nPainel: ${SITE}admin.html`,
+      text: `Nova pré-reserva aguardando confirmação\n${r.nome} · ${sala}\n${PLANO[r.plano] || r.plano}\n${slots.join("\n")}\nValor: ${money(r.total)}\nPagamento: ${r.forma_escolhida === "link" ? "cartão de crédito (enviar link)" : "Pix"}\nTelefone: ${r.telefone}\nE-mail: ${r.email}\nCódigo: ${r.codigo}\n\nPainel: ${SITE}admin.html`,
       html,
     });
   } catch (e) {

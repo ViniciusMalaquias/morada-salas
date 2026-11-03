@@ -7,6 +7,7 @@
   const A = () => window.MoradaAdmin;
   const PLANO = { avulso: "Hora avulsa", pacote: "Horas antecipadas", periodo: "Período de 4h", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal", bloqueio: "Bloqueio" };
   const FORMAS = ["Pix", "Link de pagamento", "Cartão na clínica", "Dinheiro", "Outro"];
+  const FORMA_ESC = { pix: "Pix", link: "Cartão (link)" };
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
 
@@ -250,7 +251,7 @@
         <td><b>${esc(r.nome)}</b><small>${r.plano === "bloqueio" ? "Uso da clínica" : `${esc(r.codigo)} · ${r.user_id ? "com conta" : "visitante"}`}</small></td>
         <td>${esc(roomName(r.room_id))}<small>${PLANO[r.plano]}</small></td>
         <td class="clip">${esc(slotsText(r)[0] || "A combinar")}${(r.reservation_slots || []).length > 1 ? `<small>+${r.reservation_slots.length - 1} horário(s)</small>` : ""}</td>
-        <td class="num">${r.total ? M.money(r.total) : "—"}${fixo(r) ? "<small>/mês</small>" : ""}</td>
+        <td class="num">${r.total ? M.money(r.total) : "—"}${r.plano !== "bloqueio" ? `<small>${FORMA_ESC[r.forma_escolhida] || "Pix"}</small>` : ""}</td>
         <td>${pill(r)}</td>
         <td>${M.fmtDateTime(new Date(r.created_at))}</td></tr>`).join("")
       : `<tr><td colspan="6" class="empty-s">Nenhuma reserva aqui.</td></tr>`}</tbody>`;
@@ -303,10 +304,10 @@
       open.length ? open.map(r => `<tr>
         <td><b>${esc(r.nome)}</b><small>${esc(r.telefone)}</small></td>
         <td>${esc(roomName(r.room_id))}<small>${PLANO[r.plano]} · ${esc(slotsText(r)[0] || "")}${(r.reservation_slots || []).length > 1 ? ` +${r.reservation_slots.length - 1}` : ""}</small></td>
-        <td class="num">${M.money(M.dueOf(r))}${M.paidOf(r) > 0 ? `<small>de ${M.money(r.total)}</small>` : ""}</td>
+        <td class="num">${M.money(M.dueOf(r))}<small>${FORMA_ESC[r.forma_escolhida] || "Pix"}${M.paidOf(r) > 0 ? ` · de ${M.money(r.total)}` : ""}</small></td>
         <td>${atrasado(r) ? `<span class="pill p-late">Atrasado</span>` : esc(M.dueText(r))}</td>
         <td class="act"><button type="button" class="btn small" data-pay="${r.id}">Registrar</button>
-          <a class="btn ghost small" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Cobrar</a></td></tr>`).join("")
+          <a class="btn ghost small" target="_blank" rel="noopener" href="${waLink(r, r.forma_escolhida === "link" ? "link" : "cobranca")}">${r.forma_escolhida === "link" ? (r.link_pagamento ? "Reenviar link" : "Enviar link") : "Cobrar"}</a></td></tr>`).join("")
       : `<tr><td colspan="5" class="empty-s">Nada em aberto. ✓</td></tr>`}</tbody>`;
     $("#fi-pays").innerHTML = `<thead><tr><th>Data</th><th>Cliente</th><th>Referência</th><th>Forma</th><th class="num">Valor</th></tr></thead><tbody>${
       pays.length ? pays.map(p => `<tr data-open-res="${p.r.id}" tabindex="0">
@@ -342,10 +343,13 @@
 
   function waLink(r, kind) {
     const resumo = slotsText(r).join("\n");
-    const due = M.dueOf(r), pix = C.pix_chave ? `\nPix (CNPJ): ${C.pix_chave}\nClínica de Psicologia Morada do Ser Ltda` : "";
+    const due = M.dueOf(r), isLink = r.forma_escolhida === "link";
+    const pix = isLink ? "" : C.pix_chave ? `\nPix (CNPJ): ${C.pix_chave}\nClínica de Psicologia Morada do Ser Ltda` : "";
+    const comoPagar = isLink ? (r.link_pagamento ? `\nLink de pagamento (cartão de crédito): ${r.link_pagamento}` : "\nVamos te enviar o link de pagamento (cartão de crédito) por aqui.") : pix;
     const msgs = {
-      cobranca: `Olá, ${first(r.nome)}! Tudo bem? Passando para lembrar do pagamento da reserva ${r.codigo} na Clínica Morada do Ser.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor em aberto: ${M.money(due)} (${M.dueText(r)})${pix}\nDepois é só mandar o comprovante por aqui. Obrigada!`,
-      confirmada: `Olá, ${first(r.nome)}! Sua reserva na Clínica Morada do Ser (código ${r.codigo}) está confirmada.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\n${due > 0 ? `Valor: ${M.money(due)}, a pagar ${M.dueText(r)}.${pix}\n` : "Pagamento recebido, obrigada!\n"}Qualquer dúvida, é só chamar por aqui.`,
+      cobranca: `Olá, ${first(r.nome)}! Tudo bem? Passando para lembrar do pagamento da reserva ${r.codigo} na Clínica Morada do Ser.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor em aberto: ${M.money(due)} (${M.dueText(r)})${comoPagar}${isLink ? "" : "\nDepois é só mandar o comprovante por aqui."} Obrigada!`,
+      link: `Olá, ${first(r.nome)}! Segue o link de pagamento (cartão de crédito) da sua reserva ${r.codigo} na Clínica Morada do Ser:\n${r.link_pagamento || "[cole o link aqui]"}\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor: ${M.money(due)} (${M.dueText(r)}).\nQualquer dúvida, é só chamar por aqui.`,
+      confirmada: `Olá, ${first(r.nome)}! Sua reserva na Clínica Morada do Ser (código ${r.codigo}) está confirmada.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\n${due > 0 ? `Valor: ${M.money(due)}, a pagar ${M.dueText(r)}.${comoPagar}\n` : "Pagamento recebido, obrigada!\n"}Qualquer dúvida, é só chamar por aqui.`,
       recusada: `Olá, ${first(r.nome)}! Infelizmente não conseguimos confirmar sua pré-reserva (código ${r.codigo}) na Clínica Morada do Ser. Podemos ver outro horário para você?`,
       cancelada: `Olá, ${first(r.nome)}! Sua reserva (código ${r.codigo}) na Clínica Morada do Ser foi cancelada.`,
       livre: `Olá, ${first(r.nome)}! Aqui é da Clínica Morada do Ser, sobre sua reserva ${r.codigo}.`
@@ -377,11 +381,39 @@
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>
       </section>
-      ${isB ? "" : `<section class="dr-sec"><h3>Pagamentos</h3>${pays.length ? `<ul class="pays">${pays.map(p => `<li><span>${M.fmtDateTime(new Date(p.pago_em))}<small>${p.competencia ? `Horas antecipadas de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.forma || "—")}${p.obs ? ` · ${esc(p.obs)}` : ""}</small></span><b>${M.money(p.valor)}</b></li>`).join("")}</ul>` : `<p class="muted small">Nenhum pagamento registrado.</p>`}</section>`}
+      ${isB ? "" : `<section class="dr-sec"><h3>Forma de pagamento</h3>
+        <div class="grid-f">
+          <div class="field wide"><label for="dr-forma">Cliente escolheu</label><select id="dr-forma"><option value="pix" ${r.forma_escolhida !== "link" ? "selected" : ""}>Pix</option><option value="link" ${r.forma_escolhida === "link" ? "selected" : ""}>Cartão de crédito (link)</option></select></div>
+        </div>
+        <div id="dr-link-w" ${r.forma_escolhida === "link" ? "" : "hidden"}>
+          <div class="field"><label for="dr-link">Link de pagamento</label><input id="dr-link" type="url" inputmode="url" placeholder="Cole aqui o link (Mercado Pago, InfinitePay, PagSeguro…)" value="${esc(r.link_pagamento || "")}"></div>
+          <p class="muted small">Salvo aqui, o link também aparece para o cliente em Minha conta, no botão "Pagar com cartão".</p>
+          <div class="row-actions"><button type="button" class="btn small" id="dr-link-save">Salvar link</button>
+            <a class="btn ghost small" id="dr-link-wa" target="_blank" rel="noopener" href="${waLink(r, "link")}">Enviar link pelo WhatsApp</a></div>
+        </div></section>
+      <section class="dr-sec"><h3>Pagamentos</h3>${pays.length ? `<ul class="pays">${pays.map(p => `<li><span>${M.fmtDateTime(new Date(p.pago_em))}<small>${p.competencia ? `Horas antecipadas de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.forma || "—")}${p.obs ? ` · ${esc(p.obs)}` : ""}</small></span><b>${M.money(p.valor)}</b></li>`).join("")}</ul>` : `<p class="muted small">Nenhum pagamento registrado.</p>`}</section>`}
       <div class="dr-actions" id="dr-actions">${resActions(r)}</div>
       <div id="dr-form"></div>`;
     openDrawer(isB ? r.nome : r.nome, html);
     $("#dr-actions").onclick = e => onResAction(e, r);
+    if (!isB) {
+      $("#dr-forma").onchange = async e => {
+        const v = e.target.value;
+        const { error } = await sb.from("reservations").update({ forma_escolhida: v }).eq("id", r.id);
+        if (error) return A().fail("Erro ao salvar", error);
+        r.forma_escolhida = v; $("#dr-link-w").hidden = v !== "link";
+        $("#dr-link-wa").href = waLink(r, "link"); A().toast("Forma de pagamento atualizada.");
+      };
+      $("#dr-link").oninput = () => { r.link_pagamento = $("#dr-link").value.trim(); $("#dr-link-wa").href = waLink(r, "link"); };
+      $("#dr-link-save").onclick = async () => {
+        const v = $("#dr-link").value.trim();
+        if (v && !/^https?:\/\/\S+$/i.test(v)) return A().toast("Cole o link completo, começando com https://", true);
+        const { error } = await sb.from("reservations").update({ link_pagamento: v }).eq("id", r.id);
+        if (error) return A().fail("Erro ao salvar", error);
+        r.link_pagamento = v; A().toast(v ? "Link salvo. O cliente já vê o botão Pagar com cartão." : "Link removido.");
+        const local = all.find(x => x.id === r.id); if (local) local.link_pagamento = v;
+      };
+    }
   }
 
   function resActions(r) {
@@ -393,7 +425,7 @@
       <button type="button" class="linkbtn danger-text" data-a="ask-refuse">Recusar</button>`;
     if (s === "confirmada") return `
       ${M.dueOf(r) > 0 ? `<button type="button" class="btn" data-a="pay-extra">Registrar pagamento</button>
-      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Cobrar no WhatsApp</a>` : ""}
+      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, r.forma_escolhida === "link" ? "link" : "cobranca")}">${r.forma_escolhida === "link" ? "Enviar link pelo WhatsApp" : "Cobrar no WhatsApp"}</a>` : ""}
       <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Mensagem de confirmação</a>
       <button type="button" class="linkbtn danger-text" data-a="ask-cancel">Cancelar reserva</button>`;
     return `<a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "livre")}">Falar no WhatsApp</a>`;
@@ -405,7 +437,7 @@
     const paidComps = new Set((r.payments || []).map(p => p.competencia).filter(Boolean));
     return `<form class="dr-payform" id="payform" novalidate>
       ${withMonth ? `<div class="field"><label for="pf-comp">Mês de referência</label><select id="pf-comp">${months.map(m => { const v = M.iso(m); return `<option value="${v}" ${paidComps.has(v) ? "disabled" : ""} ${m.getMonth() === now.getMonth() && !paidComps.has(v) ? "selected" : ""}>${MESES[m.getMonth()]} ${m.getFullYear()}${paidComps.has(v) ? " (paga)" : ""}</option>`; }).join("")}</select></div>` : ""}
-      <div class="field"><label for="pf-forma">Forma de pagamento</label><select id="pf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
+      <div class="field"><label for="pf-forma">Forma de pagamento</label><select id="pf-forma">${FORMAS.map(f => `<option ${f === (r.forma_escolhida === "link" ? "Link de pagamento" : "Pix") ? "selected" : ""}>${f}</option>`).join("")}</select></div>
       <div class="field"><label for="pf-valor">Valor recebido (R$)</label><input id="pf-valor" type="number" step="0.01" min="0" value="${M.dueOf(r) || ""}"></div>
       <div class="field"><label for="pf-obs">Observação</label><input id="pf-obs" type="text" placeholder="Opcional"></div>
       <div class="row-actions"><button type="submit" class="btn">${label}</button><button type="button" class="btn ghost" data-a="back">Cancelar</button></div></form>`;
@@ -510,6 +542,7 @@
           <div class="field"><label for="nf-plano">Plano</label><select id="nf-plano"><option value="avulso">Hora avulsa</option><option value="periodo">Período de 4h</option><option value="pacote">Horas antecipadas</option></select></div>
           <div class="field"><label for="nf-valor">Valor (R$)</label><input id="nf-valor" type="number" step="0.01" min="0"></div>
           <div class="field wide"><label for="nf-status">Pagamento</label><select id="nf-status"><option value="confirmada">Confirmar agora, pagamento depois</option><option value="pago">Confirmar agora, já pagou</option><option value="pendente">Deixar aguardando confirmação</option></select></div>
+          <div class="field wide"><label for="nf-fesc">Forma de pagamento</label><select id="nf-fesc"><option value="pix">Pix</option><option value="link">Cartão de crédito (link)</option></select></div>
           <div class="field wide" id="nf-forma-w" hidden><label for="nf-forma">Forma de pagamento</label><select id="nf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
         </div>
         <div id="nf-blk" hidden><div class="field"><label for="nf-motivo">Motivo</label><input id="nf-motivo" type="text" placeholder="Ex.: atendimento da clínica"></div></div>
@@ -551,7 +584,7 @@
         if (cpf && !M.cpfValid(cpf)) { btn.disabled = false; return err("CPF inválido."); }
         const plano = f("plano").value;
         const { error } = await sb.rpc("staff_create_reservation", { p: {
-          room_id: room, plano, status: f("status").value === "pago" ? "confirmada" : f("status").value, pago: f("status").value === "pago" ? "true" : "false", nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
+          room_id: room, plano, status: f("status").value === "pago" ? "confirmada" : f("status").value, pago: f("status").value === "pago" ? "true" : "false", forma_escolhida: f("fesc").value, nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
           total: f("valor").value, forma: f("forma").value, resumo: `Plano: ${PLANO[plano]}\n${fmtSlot(slot)}`, slots: [slot] } });
         if (error) { btn.disabled = false; return err(error.message); }
         A().toast("Reserva criada.");

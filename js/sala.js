@@ -343,7 +343,8 @@
     const { data, error } = await sb.rpc("request_reservation", { p: {
       room_id: room.id, plano: plan, nome, telefone: tel, email, cpf,
       profissao: $("#f-prof").value, registro: $("#f-reg").value.trim(), obs: $("#f-obs").value.trim(),
-      total: Math.round(r.total * 100) / 100, resumo, slots: r.slots, aceite: "true"
+      total: Math.round(r.total * 100) / 100, resumo, slots: r.slots, aceite: "true",
+      forma: document.querySelector('input[name="forma"]:checked')?.value || "pix"
     }});
     reset();
     if (error) {
@@ -355,15 +356,18 @@
     if (data.total != null) r.total = Number(data.total); // valor calculado pela clínica (banco)
     const quando = M.dueText({ plano: plan, slots: r.slots });
     $("#done-code").textContent = code;
+    const forma = document.querySelector('input[name="forma"]:checked')?.value || "pix";
+    const pixPl = forma === "pix" && C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code }) : "";
     $("#done-pay").innerHTML = `
       <p>Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
-      ${C.pix_chave ? (() => { const pl = M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code });
-        return `<div class="pix-done"><div class="qr" data-qr="${esc(pl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pl)}">Copiar</button></div></div></div>`; })() : ""}
-      <p class="muted small">${esc(C.pagamento_texto || "")}</p>`;
+      ${forma === "link"
+        ? `<p><b>Pagamento com cartão de crédito:</b> a clínica vai entrar em contato pelo WhatsApp para enviar o link de pagamento.</p>`
+        : pixPl ? `<div class="pix-done"><div class="qr" data-qr="${esc(pixPl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pixPl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pixPl)}">Copiar</button></div></div></div>
+          <p class="muted small">${esc(C.pagamento_texto || "")}</p>` : ""}`;
     $("#done-note").textContent = pendingConfirm
       ? `Sua conta foi criada. Confirme o e-mail que enviamos para ${email}; depois de entrar, esta reserva aparece em Minha conta.`
       : user ? "Você acompanha esta reserva em Minha conta." : "Guarde o código: com ele e seu WhatsApp você acompanha a reserva em Minha conta.";
-    $("#done-wa").href = wa(`Olá! Fiz uma pré-reserva pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nNome: ${nome}`);
+    $("#done-wa").href = wa(`Olá! Fiz uma pré-reserva pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nPagamento: ${forma === "link" ? "cartão de crédito (link de pagamento)" : "Pix"}\nNome: ${nome}`);
     if (window.qrcode) document.querySelectorAll("[data-qr]").forEach(el => { const q = qrcode(0, "M"); q.addData(el.dataset.qr); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); });
     document.querySelectorAll("#done [data-copy]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copiado"; } catch { b.previousElementSibling.select(); } });
     document.querySelector(".booking").hidden = true;

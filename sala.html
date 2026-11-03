@@ -23,8 +23,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611031623">
-<link rel="stylesheet" href="css/sala.css?v=202611031623">
+<link rel="stylesheet" href="css/style.css?v=202611031814">
+<link rel="stylesheet" href="css/sala.css?v=202611031814">
 </head>
 <body>
 <header class="top">
@@ -110,6 +110,15 @@
               <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
               <div class="field"><label for="f-reg">Registro profissional (opcional)</label><input id="f-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
               <div class="field wide"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" rows="2"></textarea></div>
+              <fieldset class="wide forma">
+                <legend>Como você vai pagar?</legend>
+                <div class="forma-pick">
+                  <label class="pick"><input type="radio" name="forma" value="pix" checked>
+                    <span class="pick-body"><b>Pix</b><small>Depois da pré-reserva aparece o QR Code e o copia e cola com o valor.</small></span></label>
+                  <label class="pick"><input type="radio" name="forma" value="link">
+                    <span class="pick-body"><b>Cartão de crédito (link de pagamento)</b><small>A clínica envia o link de pagamento pelo WhatsApp.</small></span></label>
+                </div>
+              </fieldset>
               <div class="wide aceite">
                 <label class="check"><input type="checkbox" id="f-aceite"> <span>Li e aceito os <a href="termos.html#termos" target="_blank" rel="noopener">termos de uso</a> e a <a href="termos.html#privacidade" target="_blank" rel="noopener">política de privacidade</a>.</span></label>
                 <ul class="rules small" id="regras"></ul>
@@ -151,9 +160,9 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611031623"></script>
+<script src="js/config.js?v=202611031814"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/content.js?v=202611031623"></script>
-<script src="js/sala.js?v=202611031623"></script>
+<script src="js/content.js?v=202611031814"></script>
+<script src="js/sala.js?v=202611031814"></script>
 </body>
 </html>

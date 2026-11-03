@@ -87,9 +87,9 @@
     e.preventDefault(); err("#c-err", ""); $("#c-result").innerHTML = "";
     const { data, error } = await sb.rpc("reservation_by_code", { p_codigo: $("#c-code").value, p_telefone: $("#c-tel").value });
     if (error || !data) return err("#c-err", "Não encontramos uma reserva com esse código e telefone ou CPF. Confira os dados.");
-    const r = { ...data, slots: null };
-    $("#c-result").innerHTML = (M.statusOf(r, C) === "pendente" ? payCard(r) : "") + resCard(r, true) +
-      `<div class="card cta-acc"><p><b>Crie sua conta</b> para acompanhar todas as suas reservas e recibos num lugar só. Use o mesmo CPF e telefone da reserva que ela aparece sozinha.</p><button type="button" class="btn small" id="cta-signup">Criar conta</button></div>`;
+    const r = { ...data, slots: null, forma_escolhida: data.forma, link_pagamento: data.link || "", payments: data.pago ? [{ valor: data.pago }] : [] };
+    $("#c-result").innerHTML = (r.status === "confirmada" && M.dueOf(r) > 0 ? payCard(r) : "") + resCard(r, true) +
+      `<div class="card cta-acc"><p><b>Crie sua conta</b> para acompanhar todas as suas reservas e recibos num lugar só. Use o mesmo e-mail da reserva que ela aparece sozinha depois que você confirmar o e-mail.</p><button type="button" class="btn small" id="cta-signup">Criar conta</button></div>`;
     paintQrs();
     $("#cta-signup").onclick = () => { pickTab("signup"); $("#s-nome").focus(); window.scrollTo({ top: 0, behavior: "smooth" }); };
   });
@@ -120,7 +120,7 @@
   let mine = [];
   async function loadMine() {
     const { data, error } = await sb.from("reservations")
-      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,room_id,nome,cpf,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim),payments(id,competencia,valor,forma,pago_em)")
+      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,room_id,nome,cpf,forma_escolhida,link_pagamento,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim),payments(id,competencia,valor,forma,pago_em)")
       .eq("user_id", me.id).order("created_at", { ascending: false }).limit(200);
     const box = $("#my-list");
     if (error) { box.innerHTML = `<p class="err">Não foi possível carregar suas reservas.</p>`; return; }
@@ -245,16 +245,23 @@
 
   function payCard(r) {
     const val = M.dueOf(r), quando = M.dueText(r), atrasado = /venceu/.test(quando);
-    const payload = C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: val, txid: r.codigo }) : "";
+    const isLink = r.forma_escolhida === "link";
+    const payload = !isLink && C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: val, txid: r.codigo }) : "";
     return `<article class="paycard">
       <div class="pc-info">
         <span class="pill p-pend">${atrasado ? "Pagamento em atraso" : "A pagar"}</span>
         <h2>${M.money(val)}<small>${M.paidOf(r) > 0 ? ` de ${M.money(r.total)}` : ""}</small></h2>
         <p><b>${esc(r.sala || "")}</b> · ${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</p>
-        <p>Pagamento <b>${quando}</b>.</p>
-        <p class="muted small">${esc(C.pagamento_texto || "")}</p>
-        <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(val)}.`)}">Enviar comprovante</a>
-          <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Prefiro pagar a reserva ${r.codigo} por link de pagamento.`)}">Pedir link de pagamento</a></div>
+        <p>Pagamento <b>${quando}</b>, ${isLink ? "com cartão de crédito (link de pagamento)" : "por Pix"}.</p>
+        ${isLink
+          ? (/^https?:\/\//i.test(r.link_pagamento || "")
+              ? `<div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${esc(r.link_pagamento)}">Pagar com cartão</a>
+                 <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Prefiro pagar a reserva ${r.codigo} por Pix.`)}">Prefiro pagar por Pix</a></div>`
+              : `<p class="muted small">A clínica vai enviar o link de pagamento pelo WhatsApp.</p>
+                 <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Pode me enviar o link de pagamento da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(val)}?`)}">Pedir o link pelo WhatsApp</a></div>`)
+          : `<p class="muted small">${esc(C.pagamento_texto || "")}</p>
+             <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(val)}.`)}">Enviar comprovante</a>
+             <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Prefiro pagar a reserva ${r.codigo} com cartão de crédito. Pode me enviar o link de pagamento?`)}">Prefiro pagar com cartão</a></div>`}
       </div>
       ${payload ? `<div class="pc-pix"><div class="qr" data-qr="${esc(payload)}" aria-label="QR Code Pix"></div>
         <span class="small muted">Pix copia e cola</span>

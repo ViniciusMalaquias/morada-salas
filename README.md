@@ -19,7 +19,7 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 ## Como colocar no ar
 
 1. **Supabase**: crie um projeto em supabase.com (plano grátis atende).
-   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql` e `supabase/007_aviso_reserva.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
+   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql` e `supabase/008_forma_pagamento.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
    - Deixe **Allow new users to sign up** e **Confirm email** ligados (clientes criam conta pelo site).
    - Configure um **SMTP próprio** em **Authentication → Emails → SMTP Settings** (ex.: Resend ou o Gmail da clínica com senha de app). O e-mail padrão do Supabase só envia para membros do projeto, então sem isso clientes não recebem a confirmação de cadastro nem o "esqueci minha senha".
    - Equipe: a primeira pessoa entra na tabela `staff` pelo SQL Editor:
@@ -66,6 +66,7 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 - O cliente com conta vê tudo em **Minha conta**; o visitante consulta com código + WhatsApp, e pode vincular a reserva depois que criar conta. Reservas feitas com o mesmo e-mail são vinculadas automaticamente quando o e-mail é confirmado (só pelo e-mail confirmado; CPF não vincula sozinho).
 - O CPF da conta não pode ser trocado pelo cliente depois de preenchido (só pela clínica, no banco).
 - Cancelamento pelo cliente: sempre enquanto aguarda confirmação; depois de confirmada, só com mais de 24h para o horário.
+- Na pré-reserva o cliente escolhe **Pix** ou **cartão de crédito (link de pagamento)**. No link, a clínica cola o link na reserva (painel → reserva → Forma de pagamento) e envia pelo WhatsApp com a mensagem pronta; o cliente também vê o botão "Pagar com cartão" em Minha conta.
 - Pix: com a chave cadastrada, o cliente vê um QR Code Pix com o valor e o código da reserva já preenchidos, além do copia e cola.
 - Recibo para imprimir ou salvar em PDF em cada pagamento confirmado (área do cliente).
 - Só quem está na tabela `staff` acessa o painel. Clientes logados não conseguem ver dados de outras pessoas.

@@ -132,3 +132,11 @@ table.cal.one{min-width:0}
 .cal.one th[scope=row]{font-size:.95rem;color:var(--ink)}
 .cal.one th[scope=row]{width:58px}
 .cal.one.periods th[scope=row]{width:110px}
+
+/* Forma de pagamento */
+fieldset.forma{border:0;margin:0;padding:0;min-width:0}
+fieldset.forma legend{font-weight:600;font-size:.92rem;margin-bottom:8px;padding:0}
+.forma-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.forma-pick .pick input{position:absolute;opacity:0;pointer-events:none}
+.forma-pick small{color:var(--muted);font-size:.82rem;line-height:1.4}
+@media (max-width:560px){.forma-pick{grid-template-columns:1fr}}
