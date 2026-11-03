@@ -33,6 +33,8 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 
 ## Observações
 
+- Antes de cada commit, rode `python tools/versao.py`: ele carimba uma versão nos links de CSS e JS das páginas, para o navegador de quem já visitou o site baixar os arquivos novos.
+
 - Fotos são redimensionadas no navegador (máx. 1600 px, WebP) antes do envio, então foto de celular sobe rápido.
 - A primeira foto de cada sala é a capa. Se a "Foto do topo" ficar vazia, o site usa a capa da primeira sala.
 - No título principal, uma palavra entre `*asteriscos*` aparece em itálico rosé.
