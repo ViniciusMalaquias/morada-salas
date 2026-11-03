@@ -5,7 +5,7 @@
   const $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const A = () => window.MoradaAdmin;
-  const PLANO = { avulso: "Hora avulsa", pacote: "Pacote", periodo: "Período", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal", bloqueio: "Bloqueio" };
+  const PLANO = { avulso: "Hora avulsa", pacote: "Horas antecipadas", periodo: "Período de 4h", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal", bloqueio: "Bloqueio" };
   const FORMAS = ["Pix", "Link de pagamento", "Cartão na clínica", "Dinheiro", "Outro"];
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
@@ -18,8 +18,18 @@
   const todayIso = () => M.iso(new Date());
   const roomName = id => rooms.find(r => r.id === id)?.name || "";
   const st = r => r.plano === "bloqueio" ? "bloqueio" : M.statusOf(r, C);
-  const PILL = { pendente: ["Aguardando pagamento", "p-pend"], expirada: ["Prazo vencido", "p-exp"], confirmada: ["Confirmada", "p-conf"], recusada: ["Recusada", "p-off"], cancelada: ["Cancelada", "p-off"], bloqueio: ["Bloqueio", "p-blk"] };
-  const pill = r => { const [t, c] = PILL[st(r)]; return `<span class="pill ${c}">${t}</span>`; };
+  const PILL = { pendente: ["Aguardando confirmação", "p-pend"], expirada: ["Prazo vencido", "p-exp"], confirmada: ["Confirmada", "p-conf"], recusada: ["Recusada", "p-off"], cancelada: ["Cancelada", "p-off"], bloqueio: ["Bloqueio", "p-blk"] };
+  const pill = r => { const [t, c] = PILL[st(r)]; const due = r.status === "confirmada" && r.plano !== "bloqueio" && M.dueOf(r) > 0;
+    return `<span class="pill ${c}">${t}</span>${due ? `<span class="pill ${atrasado(r) ? "p-late" : "p-pend"}">${atrasado(r) ? "Pagamento atrasado" : "A pagar"}</span>` : ""}`; };
+  // pagamento em atraso: avulsa/período depois do dia do atendimento; horas antecipadas depois do dia 05
+  function atrasado(r) {
+    if (r.status !== "confirmada" || M.dueOf(r) <= 0) return false;
+    const datas = (r.reservation_slots || []).map(x => x.data).sort(), hoje = M.iso(new Date());
+    if (!datas.length) return false;
+    if (r.plano === "pacote") { const [y, m] = datas[0].split("-").map(Number); return new Date() > new Date(y, m - 1, 5, 23, 59); }
+    return datas[0] < hoje;
+  }
+  const aReceber = () => all.filter(r => r.status === "confirmada" && r.plano !== "bloqueio" && M.dueOf(r) > 0);
   const waNum = t => { let d = M.onlyDigits(t); if (d.length === 10 || d.length === 11) d = "55" + d; return d; };
   const first = n => String(n || "").split(" ")[0];
   const H = () => C.horarios || M.DEFAULTS.horarios;
@@ -105,6 +115,7 @@
       const r = e.target.closest("[data-open-res]"); if (r) { e.preventDefault(); openRes(r.dataset.openRes); }
       const c = e.target.closest("[data-open-cli]"); if (c) { e.preventDefault(); openCliente(c.dataset.openCli); }
       const m = e.target.closest("[data-mens]"); if (m) { e.preventDefault(); openMensalidade(m.dataset.mens, m.dataset.comp); }
+      const pb = e.target.closest("[data-pay]"); if (pb) { e.preventDefault(); openRes(pb.dataset.pay); $("#dr-actions [data-a=pay-extra]")?.click(); }
       const g = e.target.closest("[data-goto]"); if (g) { e.preventDefault(); A().go(g.dataset.goto); }
     });
     $("#bk-json").onclick = backupJson;
@@ -139,13 +150,13 @@
     const recMes = all.flatMap(r => r.payments || []).filter(p => { const d = new Date(p.pago_em); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).reduce((s, p) => s + Number(p.valor), 0);
     const ev = dayEvents(today).filter(x => x.r.plano !== "bloqueio");
     const ws = weekStats(), tot = ws.reduce((a, w) => [a[0] + w.used, a[1] + w.open], [0, 0]);
-    const mens = mensalidades(now).filter(m => m.status !== "paga");
+    const rec = aReceber(), late = rec.filter(atrasado);
     $("#kpis").innerHTML = [
-      kpi("Aguardando pagamento", pend.length, pend.length ? `${M.money(pend.reduce((s, r) => s + Number(r.total || 0), 0))} a receber` : "Nada pendente", "reservas", pend.length ? "warn" : ""),
+      kpi("Aguardando confirmação", pend.length, pend.length ? "pré-reservas para confirmar" : "Nada pendente", "reservas", pend.length ? "warn" : ""),
       kpi(`Recebido em ${MESES[now.getMonth()]}`, M.money(recMes), "pagamentos registrados", "financeiro"),
       kpi("Atendimentos hoje", ev.length, ev.length ? `${ev.reduce((s, x) => s + x.s.hora_fim - x.s.hora_ini, 0)}h reservadas` : "Agenda livre", "agenda"),
       kpi("Ocupação da semana", `${tot[1] ? Math.round(tot[0] / tot[1] * 100) : 0}%`, `${tot[0]}h de ${tot[1]}h disponíveis`, "agenda"),
-      kpi("Mensalidades em aberto", mens.length, mens.filter(m => m.status === "atrasada").length ? `${mens.filter(m => m.status === "atrasada").length} atrasada(s)` : "deste mês", "financeiro", mens.some(m => m.status === "atrasada") ? "warn" : "")
+      kpi("A receber", M.money(rec.reduce((t, r) => t + M.dueOf(r), 0)), late.length ? `${late.length} pagamento(s) atrasado(s)` : `${rec.length} reserva(s) confirmada(s)`, "financeiro", late.length ? "warn" : "")
     ].join("");
     $$("#kpis [data-go]").forEach(k => k.onclick = () => A().go(k.dataset.go));
 
@@ -157,9 +168,8 @@
       : `<p class="empty-s">Nenhum atendimento hoje.</p>`;
 
     const att = [];
-    pend.forEach(r => { const left = (M.expiresAt(r, C) - now) / 36e5; att.push({ w: left, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot ${left < 3 ? "red" : "amber"}"></span><span><b>${esc(r.nome)}</b> aguarda pagamento<small>${esc(roomName(r.room_id))} · ${M.money(r.total)} · vence ${left < 1 ? "em menos de 1h" : `em ${Math.floor(left)}h`}</small></span></button>` }); });
-    all.filter(r => st(r) === "expirada" && (now - M.expiresAt(r, C)) < 7 * 864e5).forEach(r => att.push({ w: 1000, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot gray"></span><span><b>${esc(r.nome)}</b>: prazo de pagamento venceu<small>O horário foi liberado. Recuse ou confirme se ainda estiver livre.</small></span></button>` }));
-    mens.filter(m => m.status === "atrasada").forEach(m => att.push({ w: -1, html: `<button type="button" class="att" data-mens="${m.r.id}" data-comp="${m.comp}"><span class="dot red"></span><span><b>${esc(m.r.nome)}</b>: mensalidade de ${MESES[now.getMonth()]} atrasada<small>${esc(roomName(m.r.room_id))} · ${M.money(m.valor)}</small></span></button>` }));
+    pend.forEach(r => { const h = (now - new Date(r.created_at)) / 36e5; att.push({ w: -h, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot ${h > 12 ? "red" : "amber"}"></span><span><b>${esc(r.nome)}</b> aguarda confirmação<small>${esc(roomName(r.room_id))} · ${PLANO[r.plano]} · ${M.money(r.total)} · pedido ${h < 1 ? "agora há pouco" : `há ${Math.floor(h)}h`}</small></span></button>` }); });
+    late.forEach(r => att.push({ w: 500, html: `<button type="button" class="att" data-open-res="${r.id}"><span class="dot red"></span><span><b>${esc(r.nome)}</b>: pagamento atrasado<small>${esc(roomName(r.room_id))} · ${PLANO[r.plano]} · falta ${M.money(M.dueOf(r))}</small></span></button>` }));
     const bk = C.ultimo_backup ? new Date(C.ultimo_backup) : null;
     if (!bk || now - bk > 7 * 864e5) att.push({ w: 2000, html: `<button type="button" class="att" data-goto="equipe"><span class="dot amber"></span><span><b>Fazer o backup da semana</b><small>${bk ? `Último backup em ${M.br(bk)}` : "Nenhum backup baixado ainda"} · leva 10 segundos</small></span></button>` });
     $("#attention").innerHTML = att.length ? att.sort((a, b) => a.w - b.w).map(a => a.html).join("") : `<p class="empty-s">Tudo em dia. ✓</p>`;
@@ -278,30 +288,30 @@
   }
   function renderFinanceiro() {
     $("#fi-label").textContent = `${MESES[fiMonth.getMonth()].replace(/^./, c => c.toUpperCase())} de ${fiMonth.getFullYear()}`;
-    const pays = paymentsOfMonth(fiMonth), mens = mensalidades(fiMonth);
+    const pays = paymentsOfMonth(fiMonth);
     const rec = pays.reduce((s, p) => s + Number(p.valor), 0);
     const pend = all.filter(r => st(r) === "pendente");
-    const mensOpen = mens.filter(m => m.status !== "paga");
+    const open = aReceber().sort((a, b) => (atrasado(b) - atrasado(a)) || String((a.reservation_slots || [])[0]?.data).localeCompare(String((b.reservation_slots || [])[0]?.data)));
+    const late = open.filter(atrasado);
     $("#fi-kpis").innerHTML = [
       kpi("Recebido no mês", M.money(rec), `${pays.length} pagamento(s)`, "financeiro"),
-      kpi("Pré-reservas a receber", M.money(pend.reduce((s, r) => s + Number(r.total || 0), 0)), `${pend.length} aguardando pagamento`, "reservas", pend.length ? "warn" : ""),
-      kpi("Mensalidades do mês", `${mens.length - mensOpen.length}/${mens.length}`, mensOpen.length ? `${M.money(mensOpen.reduce((s, m) => s + m.valor, 0))} em aberto` : "todas pagas", "financeiro", mensOpen.some(m => m.status === "atrasada") ? "warn" : "")
+      kpi("A receber", M.money(open.reduce((t, r) => t + M.dueOf(r), 0)), `${open.length} reserva(s) confirmada(s)`, "financeiro", late.length ? "warn" : ""),
+      kpi("Aguardando confirmação", pend.length, pend.length ? `${M.money(pend.reduce((t, r) => t + Number(r.total || 0), 0))} se confirmadas` : "Nada pendente", "reservas", pend.length ? "warn" : "")
     ].join("");
     $$("#fi-kpis [data-go]").forEach(k => k.onclick = () => A().go(k.dataset.go));
-    const SM = { paga: ["Paga", "p-conf"], aberta: ["Em aberto", "p-pend"], atrasada: ["Atrasada", "p-late"] };
-    $("#fi-mens").innerHTML = `<thead><tr><th>Cliente</th><th>Sala e plano</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead><tbody>${
-      mens.length ? mens.map(m => `<tr>
-        <td><b>${esc(m.r.nome)}</b><small>${esc(m.r.telefone)}</small></td>
-        <td>${esc(roomName(m.r.room_id))}<small>${PLANO[m.r.plano]} · ${esc(slotsText(m.r).join("; "))}</small></td>
-        <td class="num">${M.money(m.pay ? m.pay.valor : m.valor)}</td>
-        <td><span class="pill ${SM[m.status][1]}">${SM[m.status][0]}</span>${m.pay ? `<small>${M.fmtDateTime(new Date(m.pay.pago_em))} · ${esc(m.pay.forma)}</small>` : ""}</td>
-        <td class="act">${m.pay ? "" : `<button type="button" class="btn small" data-mens="${m.r.id}" data-comp="${m.comp}">Registrar</button>
-          <a class="btn ghost small" target="_blank" rel="noopener" href="${waCobrancaMensal(m)}">Cobrar</a>`}</td></tr>`).join("")
-      : `<tr><td colspan="5" class="empty-s">Nenhum plano fixo ativo neste mês.</td></tr>`}</tbody>`;
+    $("#fi-mens").innerHTML = `<thead><tr><th>Cliente</th><th>Sala e plano</th><th class="num">Em aberto</th><th>Vencimento</th><th></th></tr></thead><tbody>${
+      open.length ? open.map(r => `<tr>
+        <td><b>${esc(r.nome)}</b><small>${esc(r.telefone)}</small></td>
+        <td>${esc(roomName(r.room_id))}<small>${PLANO[r.plano]} · ${esc(slotsText(r)[0] || "")}${(r.reservation_slots || []).length > 1 ? ` +${r.reservation_slots.length - 1}` : ""}</small></td>
+        <td class="num">${M.money(M.dueOf(r))}${M.paidOf(r) > 0 ? `<small>de ${M.money(r.total)}</small>` : ""}</td>
+        <td>${atrasado(r) ? `<span class="pill p-late">Atrasado</span>` : esc(M.dueText(r))}</td>
+        <td class="act"><button type="button" class="btn small" data-pay="${r.id}">Registrar</button>
+          <a class="btn ghost small" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Cobrar</a></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty-s">Nada em aberto. ✓</td></tr>`}</tbody>`;
     $("#fi-pays").innerHTML = `<thead><tr><th>Data</th><th>Cliente</th><th>Referência</th><th>Forma</th><th class="num">Valor</th></tr></thead><tbody>${
       pays.length ? pays.map(p => `<tr data-open-res="${p.r.id}" tabindex="0">
         <td>${M.fmtDateTime(new Date(p.pago_em))}</td><td><b>${esc(p.r.nome)}</b><small>${esc(roomName(p.r.room_id))}</small></td>
-        <td>${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : PLANO[p.r.plano]}<small>${esc(p.r.codigo)}</small></td>
+        <td>${p.competencia ? `Horas antecipadas de ${MESES[M.parse(p.competencia).getMonth()]}` : PLANO[p.r.plano]}<small>${esc(p.r.codigo)}</small></td>
         <td>${esc(p.forma || "—")}</td><td class="num">${M.money(p.valor)}</td></tr>`).join("")
       : `<tr><td colspan="5" class="empty-s">Nenhum pagamento registrado neste mês.</td></tr>`}</tbody>`;
   }
@@ -314,7 +324,7 @@
     const pays = paymentsOfMonth(fiMonth);
     const rows = [["Data", "Cliente", "CPF", "Sala", "Plano", "Referência", "Forma", "Valor", "Código"]].concat(pays.map(p => [
       new Date(p.pago_em).toLocaleString("pt-BR"), p.r.nome, p.r.cpf ? M.cpfFormat(p.r.cpf) : "", roomName(p.r.room_id), PLANO[p.r.plano],
-      p.competencia ? `Mensalidade ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva", p.forma, String(p.valor).replace(".", ","), p.r.codigo]));
+      p.competencia ? `Horas antecipadas ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva", p.forma, String(p.valor).replace(".", ","), p.r.codigo]));
     const csv = "﻿" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -332,10 +342,10 @@
 
   function waLink(r, kind) {
     const resumo = slotsText(r).join("\n");
-    const prazo = M.fmtDateTime(M.expiresAt(r, C));
+    const due = M.dueOf(r), pix = C.pix_chave ? `\nPix (CNPJ): ${C.pix_chave}\nClínica de Psicologia Morada do Ser Ltda` : "";
     const msgs = {
-      cobranca: `Olá, ${first(r.nome)}! Recebemos sua pré-reserva na Clínica Morada do Ser (código ${r.codigo}).\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor: ${M.money(r.total)}${fixo(r) ? " por mês" : ""}\n${C.pix_chave ? `Para garantir o horário, pague por Pix até ${prazo}:\nChave: ${C.pix_chave}\nRecebedor: ${C.pix_nome || ""}\n` : `Para garantir o horário, o pagamento precisa ser feito até ${prazo}. `}Depois é só mandar o comprovante por aqui.`,
-      confirmada: `Olá, ${first(r.nome)}! Recebemos seu pagamento e sua reserva na Clínica Morada do Ser (código ${r.codigo}) está confirmada.\n${roomName(r.room_id)}\n${resumo}\nQualquer dúvida, é só chamar por aqui.`,
+      cobranca: `Olá, ${first(r.nome)}! Tudo bem? Passando para lembrar do pagamento da reserva ${r.codigo} na Clínica Morada do Ser.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\nValor em aberto: ${M.money(due)} (${M.dueText(r)})${pix}\nDepois é só mandar o comprovante por aqui. Obrigada!`,
+      confirmada: `Olá, ${first(r.nome)}! Sua reserva na Clínica Morada do Ser (código ${r.codigo}) está confirmada.\n${roomName(r.room_id)} · ${PLANO[r.plano]}\n${resumo}\n${due > 0 ? `Valor: ${M.money(due)}, a pagar ${M.dueText(r)}.${pix}\n` : "Pagamento recebido, obrigada!\n"}Qualquer dúvida, é só chamar por aqui.`,
       recusada: `Olá, ${first(r.nome)}! Infelizmente não conseguimos confirmar sua pré-reserva (código ${r.codigo}) na Clínica Morada do Ser. Podemos ver outro horário para você?`,
       cancelada: `Olá, ${first(r.nome)}! Sua reserva (código ${r.codigo}) na Clínica Morada do Ser foi cancelada.`,
       livre: `Olá, ${first(r.nome)}! Aqui é da Clínica Morada do Ser, sobre sua reserva ${r.codigo}.`
@@ -362,13 +372,12 @@
           <dt>Sala</dt><dd>${esc(roomName(r.room_id))}</dd>
           <dt>Plano</dt><dd>${PLANO[r.plano]}</dd>
           <dt>Horários</dt><dd><ul class="ul">${(slotsText(r).length ? slotsText(r) : ["A combinar"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul></dd>
-          ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${fixo(r) ? " por mês (estimativa)" : ""}</dd>`}
+          ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${r.total && M.dueOf(r) > 0 ? ` · em aberto ${M.money(M.dueOf(r))} (${atrasado(r) ? "atrasado" : M.dueText(r)})` : r.total ? " · pago" : ""}</dd>`}
           <dt>Pedido em</dt><dd>${M.fmtDateTime(new Date(r.created_at))}</dd>
-          ${s === "pendente" ? `<dt>Prazo</dt><dd>Pagar até <b>${M.fmtDateTime(M.expiresAt(r, C))}</b></dd>` : ""}
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>
-        ${s === "expirada" ? `<p class="note">O prazo passou e o horário voltou a ficar livre no site. Dá para confirmar se ninguém tiver reservado o horário.</p>` : ""}</section>
-      ${isB ? "" : `<section class="dr-sec"><h3>Pagamentos</h3>${pays.length ? `<ul class="pays">${pays.map(p => `<li><span>${M.fmtDateTime(new Date(p.pago_em))}<small>${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.forma || "—")}${p.obs ? ` · ${esc(p.obs)}` : ""}</small></span><b>${M.money(p.valor)}</b></li>`).join("")}</ul>` : `<p class="muted small">Nenhum pagamento registrado.</p>`}</section>`}
+      </section>
+      ${isB ? "" : `<section class="dr-sec"><h3>Pagamentos</h3>${pays.length ? `<ul class="pays">${pays.map(p => `<li><span>${M.fmtDateTime(new Date(p.pago_em))}<small>${p.competencia ? `Horas antecipadas de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.forma || "—")}${p.obs ? ` · ${esc(p.obs)}` : ""}</small></span><b>${M.money(p.valor)}</b></li>`).join("")}</ul>` : `<p class="muted small">Nenhum pagamento registrado.</p>`}</section>`}
       <div class="dr-actions" id="dr-actions">${resActions(r)}</div>
       <div id="dr-form"></div>`;
     openDrawer(isB ? r.nome : r.nome, html);
@@ -379,12 +388,13 @@
     const s = st(r);
     if (r.plano === "bloqueio") return r.status === "confirmada" ? `<button type="button" class="btn ghost" data-a="ask-cancel">Remover bloqueio</button>` : "";
     if (s === "pendente" || s === "expirada") return `
-      <button type="button" class="btn" data-a="pay-confirm">Pagamento recebido</button>
-      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Enviar cobrança</a>
+      <button type="button" class="btn" data-a="confirm">Confirmar reserva</button>
+      <button type="button" class="btn ghost" data-a="pay-confirm">Confirmar e registrar pagamento</button>
       <button type="button" class="linkbtn danger-text" data-a="ask-refuse">Recusar</button>`;
     if (s === "confirmada") return `
-      ${fixo(r) ? `<button type="button" class="btn" data-a="pay-month">Registrar mensalidade</button>` : `<button type="button" class="btn ghost" data-a="pay-extra">Registrar pagamento</button>`}
-      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Mensagem no WhatsApp</a>
+      ${M.dueOf(r) > 0 ? `<button type="button" class="btn" data-a="pay-extra">Registrar pagamento</button>
+      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "cobranca")}">Cobrar no WhatsApp</a>` : ""}
+      <a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "confirmada")}">Mensagem de confirmação</a>
       <button type="button" class="linkbtn danger-text" data-a="ask-cancel">Cancelar reserva</button>`;
     return `<a class="btn ghost" target="_blank" rel="noopener" href="${waLink(r, "livre")}">Falar no WhatsApp</a>`;
   }
@@ -396,7 +406,7 @@
     return `<form class="dr-payform" id="payform" novalidate>
       ${withMonth ? `<div class="field"><label for="pf-comp">Mês de referência</label><select id="pf-comp">${months.map(m => { const v = M.iso(m); return `<option value="${v}" ${paidComps.has(v) ? "disabled" : ""} ${m.getMonth() === now.getMonth() && !paidComps.has(v) ? "selected" : ""}>${MESES[m.getMonth()]} ${m.getFullYear()}${paidComps.has(v) ? " (paga)" : ""}</option>`; }).join("")}</select></div>` : ""}
       <div class="field"><label for="pf-forma">Forma de pagamento</label><select id="pf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
-      <div class="field"><label for="pf-valor">Valor recebido (R$)</label><input id="pf-valor" type="number" step="0.01" min="0" value="${r.total ?? ""}"></div>
+      <div class="field"><label for="pf-valor">Valor recebido (R$)</label><input id="pf-valor" type="number" step="0.01" min="0" value="${M.dueOf(r) || ""}"></div>
       <div class="field"><label for="pf-obs">Observação</label><input id="pf-obs" type="text" placeholder="Opcional"></div>
       <div class="row-actions"><button type="submit" class="btn">${label}</button><button type="button" class="btn ghost" data-a="back">Cancelar</button></div></form>`;
   }
@@ -408,6 +418,16 @@
     if (a === "back") { acts.innerHTML = resActions(r); form.innerHTML = ""; return; }
     if (a === "ask-refuse") return ask("Recusar esta pré-reserva? Os horários voltam a ficar livres.", "refuse", "Recusar");
     if (a === "ask-cancel") return ask(r.plano === "bloqueio" ? "Remover este bloqueio?" : "Cancelar esta reserva? Os horários voltam a ficar livres.", "cancel", r.plano === "bloqueio" ? "Remover" : "Cancelar reserva");
+    if (a === "confirm") {
+      b.disabled = true;
+      const { error } = await sb.rpc("confirm_reservation", { p_id: r.id, p_forma: null, p_valor: null, p_obs: null });
+      if (error) { b.disabled = false; return A().toast(error.message, true); }
+      A().toast("Reserva confirmada.");
+      await reload(); openRes(r.id);
+      const nr = all.find(x => x.id === r.id);
+      $("#dr-actions").insertAdjacentHTML("afterbegin", `<p class="note ok">Reserva confirmada. <a href="${waLink(nr, "confirmada")}" target="_blank" rel="noopener">Avisar no WhatsApp →</a></p>`);
+      return;
+    }
     if (a === "pay-confirm" || a === "pay-month" || a === "pay-extra") {
       acts.innerHTML = "";
       form.innerHTML = payForm(r, { withMonth: a === "pay-month", label: a === "pay-confirm" ? "Confirmar reserva" : "Registrar" });
@@ -487,9 +507,9 @@
           <div class="field"><label for="nf-tel">Telefone</label><input id="nf-tel" type="tel"></div>
           <div class="field"><label for="nf-cpf">CPF</label><input id="nf-cpf" type="text" inputmode="numeric" data-cpf></div>
           <div class="field wide"><label for="nf-email">E-mail</label><input id="nf-email" type="email"></div>
-          <div class="field"><label for="nf-plano">Plano</label><select id="nf-plano"><option value="avulso">Hora avulsa</option><option value="periodo">Período</option><option value="pacote">Pacote</option><option value="semanal">Fixo semanal</option><option value="quinzenal">Fixo quinzenal</option></select></div>
+          <div class="field"><label for="nf-plano">Plano</label><select id="nf-plano"><option value="avulso">Hora avulsa</option><option value="periodo">Período de 4h</option><option value="pacote">Horas antecipadas</option></select></div>
           <div class="field"><label for="nf-valor">Valor (R$)</label><input id="nf-valor" type="number" step="0.01" min="0"></div>
-          <div class="field wide"><label for="nf-status">Pagamento</label><select id="nf-status"><option value="pendente">Ainda não pagou (aguardando pagamento)</option><option value="confirmada">Já pagou (confirmar agora)</option></select></div>
+          <div class="field wide"><label for="nf-status">Pagamento</label><select id="nf-status"><option value="confirmada">Confirmar agora, pagamento depois</option><option value="pago">Confirmar agora, já pagou</option><option value="pendente">Deixar aguardando confirmação</option></select></div>
           <div class="field wide" id="nf-forma-w" hidden><label for="nf-forma">Forma de pagamento</label><select id="nf-forma">${FORMAS.map(f => `<option>${f}</option>`).join("")}</select></div>
         </div>
         <div id="nf-blk" hidden><div class="field"><label for="nf-motivo">Motivo</label><input id="nf-motivo" type="text" placeholder="Ex.: atendimento da clínica"></div></div>
@@ -501,11 +521,9 @@
     const sync = () => {
       const hrs = Math.max(0, +f("fim").value - +f("ini").value), plano = f("plano").value;
       if (kind === "res" && !f("valor").dataset.touched) {
-        const rate = plano === "semanal" ? M.semanalRate(C, hrs) : plano === "quinzenal" ? C.preco_quinzenal : plano === "periodo" ? C.preco_periodo : C.preco_avulso;
-        f("valor").value = plano === "pacote" ? C.pacote_preco : (hrs * rate * (plano === "semanal" ? 4 : plano === "quinzenal" ? 2 : 1)).toFixed(2);
+        f("valor").value = (plano === "periodo" ? C.preco_periodo_bloco * Math.max(1, Math.round(hrs / 4)) : hrs * (plano === "pacote" ? C.preco_antecipada : C.preco_avulso)).toFixed(2);
       }
-      if ((plano === "semanal" || plano === "quinzenal") && f("freq").value === "unica") f("freq").value = plano;
-      f("forma-w").hidden = f("status").value !== "confirmada";
+      f("forma-w").hidden = f("status").value !== "pago";
     };
     ["ini", "fim", "plano", "status", "freq"].forEach(k => f(k).addEventListener("change", sync));
     f("valor").addEventListener("input", () => f("valor").dataset.touched = "1");
@@ -533,7 +551,7 @@
         if (cpf && !M.cpfValid(cpf)) { btn.disabled = false; return err("CPF inválido."); }
         const plano = f("plano").value;
         const { error } = await sb.rpc("staff_create_reservation", { p: {
-          room_id: room, plano, status: f("status").value, nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
+          room_id: room, plano, status: f("status").value === "pago" ? "confirmada" : f("status").value, pago: f("status").value === "pago" ? "true" : "false", nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
           total: f("valor").value, forma: f("forma").value, resumo: `Plano: ${PLANO[plano]}\n${fmtSlot(slot)}`, slots: [slot] } });
         if (error) { btn.disabled = false; return err(error.message); }
         A().toast("Reserva criada.");

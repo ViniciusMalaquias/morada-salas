@@ -22,7 +22,7 @@
   // ---------- topo da sala ----------
   const urls = (room.photos || []).map(p => M.photoUrl(p.path)).filter(Boolean);
   const plans = M.plans(C);
-  const minRate = Math.min(C.preco_avulso, C.preco_periodo, C.preco_quinzenal, C.semanal_1, C.semanal_4, C.semanal_8, C.pacote_preco / C.pacote_horas);
+  const minRate = Math.min(C.preco_avulso, C.preco_antecipada, C.preco_periodo_bloco / 4);
   $("#room-top").innerHTML = `
     <div class="gallery-main">${urls[0] ? `<img id="g-main" src="${esc(urls[0])}" alt="${esc(room.name)}">` : `<div class="ph"><div>Fotos em breve</div></div>`}</div>
     <div class="room-info">
@@ -72,8 +72,8 @@
     $("#time-title").textContent = m === "fixo" ? "Escolha seus horários fixos" : m === "periodo" ? "Escolha os períodos" : "Escolha os horários";
     $("#time-hint").textContent =
       plan === "avulso" ? "Toque nas horas que quer reservar. Cada hora comporta uma sessão de 50 minutos." :
-      plan === "pacote" ? `Marque agora as primeiras horas do pacote, se quiser. As outras você combina depois com a clínica (até ${C.pacote_horas}h no total).` :
-      plan === "periodo" ? "Toque nos períodos que quer reservar." :
+      plan === "pacote" ? `Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.` :
+      plan === "periodo" ? `Toque nos períodos que quer reservar. Cada período de 4h sai ${M.money(C.preco_periodo_bloco)}.` :
       plan === "semanal" ? "Toque nas horas que vão se repetir toda semana. Quanto mais horas por semana, menor o valor da hora." :
       "Toque nas horas que vão se repetir a cada 15 dias.";
     refresh();
@@ -192,7 +192,10 @@
     const k = b.dataset.k;
     if (sel.has(k)) sel.delete(k);
     else {
-      if (plan === "pacote" && sel.size >= C.pacote_horas) return showErr(`O pacote tem ${C.pacote_horas} horas. Desmarque uma hora para escolher outra.`);
+      if (plan === "pacote" && sel.size) {
+        const mes = k => k.split("|")[0].slice(0, 7), first = mes([...sel][0]);
+        if (mes(k) !== first) return showErr("As horas antecipadas precisam ser todas no mesmo mês. Desmarque as do outro mês para escolher estas.");
+      }
       sel.add(k);
     }
     hideErr(); drawCal(); summary();
@@ -212,8 +215,12 @@
         M.ranges(byDate[d]).forEach(([a, b]) => { slots.push({ freq: "unica", data: d, hora_ini: a, hora_fim: b }); lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${a}h–${b}h`); });
       });
       hours = sel.size;
-      if (plan === "avulso") { total = hours * C.preco_avulso; priceLines.push(`${hours}h × ${M.money(C.preco_avulso)}`); }
-      else { total = C.pacote_preco; priceLines.push(`Pacote ${C.pacote_horas}h (${M.money(C.pacote_preco / C.pacote_horas)}/h)`, `${hours} de ${C.pacote_horas}h marcadas agora`); }
+      if (plan === "avulso") { total = hours * C.preco_avulso; priceLines.push(`${hours}h × ${M.money(C.preco_avulso)}`, "Pago no dia do atendimento"); }
+      else {
+        total = hours * C.preco_antecipada; priceLines.push(`${hours}h × ${M.money(C.preco_antecipada)}`);
+        if (hours < C.antecipadas_min) priceLines.push(`Faltam ${C.antecipadas_min - hours}h para o mínimo de ${C.antecipadas_min}h no mês.`);
+        else priceLines.push("Acerto até o dia 05 do mês");
+      }
     } else if (m === "periodo") {
       [...sel].sort().forEach(k => {
         const [d, pi] = k.split("|"), p = P[+pi];
@@ -221,7 +228,7 @@
         lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${p.nome} (${p.ini}h–${p.fim}h)`);
         hours += p.fim - p.ini;
       });
-      total = hours * C.preco_periodo; priceLines.push(`${hours}h × ${M.money(C.preco_periodo)}`);
+      total = sel.size * C.preco_periodo_bloco; priceLines.push(`${sel.size} ${sel.size > 1 ? "períodos" : "período"} × ${M.money(C.preco_periodo_bloco)}`, "Pago no dia do atendimento");
     } else {
       const byDow = {};
       sel.forEach(k => { const [d, h] = k.split("|"); (byDow[d] ||= []).push(+h); });
@@ -259,7 +266,7 @@
       </dl>
       <div class="price">${r.priceLines.map(l => `<span>${esc(l)}</span>`).join("")}
         <p class="total"><span>${r.totalLabel}</span><strong>${M.money(r.total)}</strong></p></div>`;
-    $("#btn-send").disabled = !(r.slots.length || plan === "pacote");
+    $("#btn-send").disabled = !r.slots.length || (plan === "pacote" && r.hours < C.antecipadas_min);
   }
 
   // ---------- dados, conta e envio ----------
@@ -309,7 +316,8 @@
   $("#btn-send").addEventListener("click", async () => {
     const r = compute(); if (!r) return;
     const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim(), email = $("#f-email").value.trim(), cpf = M.onlyDigits($("#f-cpf").value);
-    if (!r.slots.length && plan !== "pacote") return showErr("Escolha pelo menos um horário.");
+    if (!r.slots.length) return showErr("Escolha pelo menos um horário.");
+    if (plan === "pacote" && r.hours < C.antecipadas_min) return showErr(`As horas antecipadas são de no mínimo ${C.antecipadas_min} horas no mês.`);
     if (authMode === "login") return showErr("Entre na sua conta ou escolha Continuar como visitante.");
     if (!M.fullName(nome)) { $("#f-nome").focus(); return showErr("Preencha seu nome completo no passo 3."); }
     if (!M.emailValid(email)) { $("#f-email").focus(); return showErr("Preencha um e-mail válido no passo 3."); }
@@ -345,11 +353,10 @@
     }
     const code = data.codigo;
     if (data.total != null) r.total = Number(data.total); // valor calculado pela clínica (banco)
-    const prazo = Number(C.prazo_pagamento_horas || 24);
-    const ate = M.fmtDateTime(new Date(Date.now() + prazo * 3600e3));
+    const quando = M.dueText({ plano: plan, slots: r.slots });
     $("#done-code").textContent = code;
     $("#done-pay").innerHTML = `
-      <p><b>Pague até ${ate}</b> para garantir o horário. Valor: <b>${M.money(r.total)}</b>${mode() === "fixo" ? " por mês (estimativa)" : ""}.</p>
+      <p>Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
       ${C.pix_chave ? (() => { const pl = M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code });
         return `<div class="pix-done"><div class="qr" data-qr="${esc(pl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pl)}">Copiar</button></div></div></div>`; })() : ""}
       <p class="muted small">${esc(C.pagamento_texto || "")}</p>`;

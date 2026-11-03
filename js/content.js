@@ -9,7 +9,7 @@
     destaques: [
       { titulo: "+30 anos", texto: "de psicologia em Jundiaí" },
       { titulo: "Por hora", texto: "das 8h às 21h, e sábado até 15h" },
-      { titulo: "Até 29%", texto: "de desconto nos planos fixos" }
+      { titulo: "Até 41%", texto: "de desconto no período de 4h" }
     ],
     publico_titulo: "Consultórios para quem atende com hora marcada",
     publico_texto: "As salas foram pensadas para sessões individuais, de casal ou família, avaliações e consultas. Ideal para quem está começando o consultório próprio ou precisa de um segundo endereço em Jundiaí.",
@@ -19,41 +19,36 @@
     estrutura_titulo: "Chegue, atenda e vá embora tranquilo",
     estrutura_texto: "Você divide a estrutura de uma clínica de psicologia em funcionamento, com o sigilo e o silêncio que o atendimento pede.",
     estrutura_itens: [
-      { titulo: "Sala de espera", texto: "Seu paciente aguarda num espaço confortável até a hora da sessão." },
-      { titulo: "Privacidade", texto: "Ambiente reservado para conversas que precisam ficar dentro da sala." },
-      { titulo: "Wi‑Fi", texto: "Internet para prontuário eletrônico, agenda e atendimentos online." },
-      { titulo: "Limpeza inclusa", texto: "Salas organizadas e higienizadas entre os atendimentos." }
+      { titulo: "Privacidade e sigilo", texto: "Salas adequadas para atendimentos de qualquer faixa etária, com a discrição que a sessão pede." },
+      { titulo: "Recepção ampla", texto: "Seus pacientes aguardam num espaço confortável, com área de coworking." },
+      { titulo: "Espaço do profissional", texto: "Área de descanso com câmera da sala de espera, Wi‑Fi, geladeira e micro-ondas." },
+      { titulo: "Banheiro privativo", texto: "Banheiro exclusivo para os profissionais." },
+      { titulo: "Térreo e piso superior", texto: "Salas nos dois andares, com opções no térreo para quem precisa de acessibilidade." }
     ],
     passos: [
       { titulo: "Escolha a sala", texto: "Veja as fotos e o que cada sala oferece." },
-      { titulo: "Escolha o plano e os horários", texto: "Hora avulsa, período ou horário fixo. Só aparecem os horários livres." },
+      { titulo: "Escolha o plano e os horários", texto: "Hora avulsa, horas antecipadas do mês ou período de 4h. Só aparecem os horários livres." },
       { titulo: "A clínica confirma", texto: "Sua pré-reserva segura o horário e a clínica confirma pelo WhatsApp." },
-      { titulo: "Comece a atender", texto: "Com a reserva confirmada, a sala é sua no horário combinado." }
+      { titulo: "Atenda e acerte", texto: "Hora avulsa e período são pagos no dia; horas antecipadas, até o dia 05 do mês." }
     ],
     regras: [
-      "Cancelamento sem custo com até 24 horas de antecedência. Depois disso, a hora é cobrada.",
-      "Quem tem horário fixo pode remarcar uma hora por mês.",
-      "Planos mensais são pagos antecipadamente, até o dia 5."
+      "A desmarcação precisa ser feita com 24 horas de antecedência. Do contrário, a sala é cobrada.",
+      "Em caso de atraso do paciente ou do profissional, o horário agendado precisa ser respeitado.",
+      "Material lúdico e materiais para o atendimento são de responsabilidade do profissional.",
+      "Horas antecipadas: mínimo de 4 horas no mês, acertadas até o dia 05. Horas não usadas não passam para o mês seguinte, e horários extras são cobrados como hora avulsa."
     ],
     // Horário de funcionamento: [abre, fecha] por dia; null = fechado
     horarios: { "Seg": [8, 21], "Ter": [8, 21], "Qua": [8, 21], "Qui": [8, 21], "Sex": [8, 21], "Sáb": [8, 15], "Dom": null },
-    periodos: [{ nome: "Manhã", ini: 8, fim: 12 }, { nome: "Tarde", ini: 14, fim: 18 }, { nome: "Noite", ini: 18, fim: 21 }],
+    periodos: [{ nome: "Manhã", ini: 8, fim: 12 }, { nome: "Tarde", ini: 13, fim: 17 }, { nome: "Noite", ini: 17, fim: 21 }],
     // Preços (R$)
-    preco_avulso: 45,
-    pacote_horas: 10,
-    pacote_preco: 400,
-    pacote_validade: 60,
-    preco_periodo: 37.5,
-    preco_quinzenal: 40,
-    semanal_1: 38,
-    semanal_4: 35,
-    semanal_8: 32,
-    // Pagamento (sem cobrança online: Pix, link ou combinado pelo WhatsApp)
-    prazo_pagamento_horas: 24,
-    pix_chave: "",
-    pix_nome: "Clínica Morada do Ser",
+    preco_avulso: 38,          // por hora, pago no dia do atendimento
+    preco_antecipada: 28,      // por hora, mínimo antecipadas_min horas no mesmo mês, acerto até o dia 05
+    antecipadas_min: 4,
+    preco_periodo_bloco: 90,   // por período (manhã, tarde ou noite)
+    pix_chave: "08174363000155",
+    pix_nome: "Clinica Morada do Ser",
     pix_cidade: "Jundiaí",
-    pagamento_texto: "Pague por Pix ou peça um link de pagamento pelo WhatsApp. Depois de pagar, envie o comprovante pelo WhatsApp com o código da reserva.",
+    pagamento_texto: "Pague por Pix (CNPJ 08.174.363/0001-55, Clínica de Psicologia Morada do Ser Ltda) ou combine pelo WhatsApp. Depois de pagar, envie o comprovante com o código da reserva.",
     whatsapp: "5511953063868",
     telefone: "(11) 95306-3868",
     email: "clinica.moradadoser@gmail.com",
@@ -78,21 +73,15 @@
       { key: "destaques", label: "Destaques (até 3)", type: "pairs", max: 3 }
     ]},
     { group: "Planos e preços", fields: [
-      { key: "preco_avulso", label: "Hora avulsa (R$ por hora)", type: "money" },
-      { key: "pacote_horas", label: "Pacote: quantidade de horas", type: "number", min: 1, max: 100 },
-      { key: "pacote_preco", label: "Pacote: preço total (R$)", type: "money" },
-      { key: "pacote_validade", label: "Pacote: prazo para usar (dias)", type: "number", min: 1, max: 365 },
-      { key: "preco_periodo", label: "Período (R$ por hora)", type: "money" },
-      { key: "preco_quinzenal", label: "Fixo quinzenal (R$ por hora)", type: "money" },
-      { key: "semanal_1", label: "Fixo semanal, 1 a 3h por semana (R$ por hora)", type: "money" },
-      { key: "semanal_4", label: "Fixo semanal, 4 a 7h por semana (R$ por hora)", type: "money" },
-      { key: "semanal_8", label: "Fixo semanal, 8h ou mais por semana (R$ por hora)", type: "money" },
+      { key: "preco_avulso", label: "Hora avulsa (R$ por hora, paga no dia)", type: "money" },
+      { key: "preco_antecipada", label: "Horas antecipadas (R$ por hora)", type: "money" },
+      { key: "antecipadas_min", label: "Horas antecipadas: mínimo de horas no mês", type: "number", min: 1, max: 100 },
+      { key: "preco_periodo_bloco", label: "Período de 4h (R$ por período)", type: "money" },
       { key: "regras", label: "Regras de uso (uma por linha)", type: "list" }
     ]},
     { group: "Pagamento", fields: [
-      { key: "prazo_pagamento_horas", label: "Prazo para pagar a pré-reserva (horas)", type: "number", min: 1, max: 168, hint: "Depois desse prazo sem pagamento, o horário volta a aparecer livre no site." },
       { key: "pix_chave", label: "Chave Pix", type: "text", hint: "Gera o QR Code com o valor já preenchido. Celular no formato +5511999999999; CPF/CNPJ só números; ou e-mail ou chave aleatória." },
-      { key: "pix_nome", label: "Nome do recebedor do Pix", type: "text" },
+      { key: "pix_nome", label: "Nome do recebedor do Pix (até 25 letras)", type: "text" },
       { key: "pix_cidade", label: "Cidade do recebedor", type: "text" },
       { key: "pagamento_texto", label: "Instruções de pagamento", type: "textarea" }
     ]},
@@ -134,19 +123,31 @@
   // ---------- preços e planos ----------
   const money = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const pct = (rate, base) => base > 0 ? Math.round((1 - rate / base) * 100) : 0;
-  const semanalRate = (C, h) => h >= 8 ? C.semanal_8 : h >= 4 ? C.semanal_4 : C.semanal_1;
+  const semanalRate = (C, h) => C.preco_avulso; // planos fixos saíram; mantido por compatibilidade
 
   function plans(C) {
     const per = (C.periodos || []).map(p => `${p.nome} ${p.ini}h–${p.fim}h`).join(" · ");
-    const pacoteHora = C.pacote_preco / C.pacote_horas;
+    const perHora = C.preco_periodo_bloco / 4;
     return [
-      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: "Para quando precisar, sem compromisso.", off: 0 },
-      { id: "pacote", nome: `Pacote ${C.pacote_horas}h`, preco: money(C.pacote_preco), desc: `Sai a ${money(pacoteHora)}/h. Horas pagas antes, para usar em até ${C.pacote_validade} dias.`, off: pct(pacoteHora, C.preco_avulso) },
-      { id: "periodo", nome: "Período", preco: `${money(C.preco_periodo)}/h`, desc: `Um turno inteiro: ${per}.`, off: pct(C.preco_periodo, C.preco_avulso) },
-      { id: "quinzenal", nome: "Fixo quinzenal", preco: `${money(C.preco_quinzenal)}/h`, desc: "O mesmo horário a cada 15 dias, cobrado por mês.", off: pct(C.preco_quinzenal, C.preco_avulso) },
-      { id: "semanal", nome: "Fixo semanal", preco: `a partir de ${money(C.semanal_8)}/h`, desc: `O mesmo horário toda semana, cobrado por mês. 1 a 3h por semana: ${money(C.semanal_1)}/h · 4 a 7h: ${money(C.semanal_4)}/h · 8h ou mais: ${money(C.semanal_8)}/h.`, off: pct(C.semanal_8, C.preco_avulso) }
+      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: "Para quando precisar, sem compromisso. Pago no dia do atendimento.", off: 0 },
+      { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês, todas no mesmo mês. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso) },
+      { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso) }
     ];
   }
+
+  // Quando pagar cada plano
+  function dueText(r) {
+    if (r.plano === "pacote") {
+      const first = (r.reservation_slots || r.slots || []).map(s => s.data).sort()[0];
+      if (!first) return "até o dia 05 do mês";
+      const [y, m] = first.split("-").map(Number);
+      const due = new Date(y, m - 1, 5, 23, 59);
+      return due < new Date() ? "o quanto antes (venceu dia 05)" : `até ${pad(5)}/${pad(m)}`;
+    }
+    return "no dia do atendimento";
+  }
+  const paidOf = r => (r.payments || []).reduce((s, p) => s + Number(p.valor || 0), 0);
+  const dueOf = r => Math.max(0, Math.round((Number(r.total || 0) - paidOf(r)) * 100) / 100);
 
   // ---------- datas (sempre no horário local) ----------
   const pad = n => String(n).padStart(2, "0");
@@ -249,13 +250,9 @@
     const { data } = await client.from("profiles").select("*").eq("id", u.id).maybeSingle();
     return { ...(data || {}), id: u.id, email: u.email };
   }
-  const STATUS_CLIENTE = { pendente: "Aguardando pagamento", confirmada: "Confirmada", recusada: "Recusada", cancelada: "Cancelada", expirada: "Prazo de pagamento vencido" };
-  // status mostrado: pendente vencido vira "expirada"
-  function statusOf(r, C) {
-    if (r.status !== "pendente") return r.status;
-    const prazo = Number(C?.prazo_pagamento_horas || 24);
-    return new Date(r.created_at).getTime() + prazo * 3600e3 < Date.now() ? "expirada" : "pendente";
-  }
+  const STATUS_CLIENTE = { pendente: "Aguardando confirmação", confirmada: "Confirmada", recusada: "Recusada", cancelada: "Cancelada", expirada: "Expirada" };
+  // a pré-reserva segura o horário até a clínica confirmar ou recusar (não expira sozinha)
+  function statusOf(r) { return r.status; }
   const expiresAt = (r, C) => new Date(new Date(r.created_at).getTime() + Number(C?.prazo_pagamento_horas || 24) * 3600e3);
   const fmtDateTime = d => d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -271,7 +268,7 @@
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
-    money, pct, plans, semanalRate, ranges, iso, parse, addDays, monday, br, pad,
+    money, pct, plans, semanalRate, dueText, paidOf, dueOf, ranges, iso, parse, addDays, monday, br, pad,
     pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };

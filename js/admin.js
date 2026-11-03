@@ -300,8 +300,9 @@
     if (badDay) return toast(`${badDay[0]}: o horário de fechar precisa ser depois do de abrir.`, true);
     const per = get("periodos") || [];
     if (!per.length || per.some(p => !(p.fim > p.ini))) return toast("Confira os períodos: use o formato Nome início-fim, ex.: Tarde 14-18.", true);
-    for (const k of ["preco_avulso", "pacote_horas", "pacote_preco", "pacote_validade", "preco_periodo", "preco_quinzenal", "semanal_1", "semanal_4", "semanal_8"])
-      if (!(get(k) > 0)) return toast("Preencha todos os preços e números do pacote com valores maiores que zero.", true);
+    for (const k of ["preco_avulso", "preco_antecipada", "antecipadas_min", "preco_periodo_bloco"])
+      if (!(get(k) > 0)) return toast("Preencha todos os preços com valores maiores que zero.", true);
+    if (per.some(p => p.fim - p.ini !== 4)) return toast("Cada período precisa ter 4 horas (ex.: Tarde 13-17), porque o preço é por período de 4h.", true);
     const { error } = await sb.from("site_content").upsert(rows);
     if (error) return fail("Erro ao salvar textos", error);
     $("#textos-status").textContent = "Tudo salvo."; toast("Textos salvos. O site já mostra a versão nova.");

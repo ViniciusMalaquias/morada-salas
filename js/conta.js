@@ -4,7 +4,7 @@
   const $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const show = id => ["#v-out", "#v-reset", "#v-in"].forEach(v => $(v).hidden = v !== id);
-  const PLANO = { avulso: "Hora avulsa", pacote: "Pacote de horas", periodo: "Período", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal" };
+  const PLANO = { avulso: "Hora avulsa", pacote: "Horas antecipadas", periodo: "Período de 4h", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal" };
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
 
@@ -172,7 +172,7 @@
   const agActive = r => r.status === "confirmada" || M.statusOf(r, C) === "pendente";
   const evTitle = r => `Atendimento · ${r.sala || "Sala"} (Morada do Ser)`;
   const evPlace = () => `${C.endereco}, ${String(C.bairro_cidade || "").replace(" · ", ", ")}`;
-  const evDesc = r => `Reserva ${r.codigo} na Clínica Morada do Ser.${r.status !== "confirmada" ? " Aguardando pagamento." : ""}\nMinha conta: ${new URL("conta.html", location.href).href}`;
+  const evDesc = r => `Reserva ${r.codigo} na Clínica Morada do Ser.${r.status !== "confirmada" ? " Aguardando confirmação da clínica." : ""}\nMinha conta: ${new URL("conta.html", location.href).href}`;
   function gcalLink(r, s, dateIso) {
     const q = new URLSearchParams({ action: "TEMPLATE", text: evTitle(r), dates: `${calUtc(dateIso, s.hora_ini)}/${calUtc(dateIso, s.hora_fim)}`, details: evDesc(r), location: evPlace(), ctz: "America/Sao_Paulo" });
     if (rrule(s)) q.set("recur", rrule(s));
@@ -210,7 +210,7 @@
       const pend = r.status !== "confirmada";
       html += `<div class="ag-item${pend ? " pend" : ""}">
         <span class="ag-time">${s.hora_ini}h<small>${s.hora_fim}h</small></span>
-        <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[PLANO[r.plano], s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando pagamento" : ""].filter(Boolean).join(" · ")}</small></span>
+        <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[PLANO[r.plano], s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando confirmação" : ""].filter(Boolean).join(" · ")}</small></span>
         <a class="linkbtn ag-g" target="_blank" rel="noopener" href="${esc(gcalLink(r, s, s.freq === "unica" ? s.data : M.iso(d)))}" title="${s.freq !== "unica" ? "Adiciona a série inteira" : "Adiciona este horário"}">+ Google Agenda</a>
       </div>`;
     });
@@ -236,24 +236,24 @@
   }
   $("#ag-ics").addEventListener("click", downloadIcs);
 
+  // Cartões de pagamento: reservas confirmadas com valor em aberto
   function renderPend() {
-    const pend = mine.filter(r => M.statusOf(r, C) === "pendente");
-    $("#pend-box").innerHTML = pend.map(payCard).join("");
+    const due = mine.filter(r => r.status === "confirmada" && M.dueOf(r) > 0);
+    $("#pend-box").innerHTML = due.map(payCard).join("");
     paintQrs();
   }
 
   function payCard(r) {
-    const exp = M.expiresAt(r, C), left = Math.max(0, exp - Date.now());
-    const hh = Math.floor(left / 36e5), mm = Math.floor(left % 36e5 / 6e4);
-    const payload = C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Number(r.total || 0), txid: r.codigo }) : "";
+    const val = M.dueOf(r), quando = M.dueText(r), atrasado = /venceu/.test(quando);
+    const payload = C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: val, txid: r.codigo }) : "";
     return `<article class="paycard">
       <div class="pc-info">
-        <span class="pill p-pend">Aguardando pagamento</span>
-        <h2>${M.money(r.total)}<small>${fixo(r) ? " primeira mensalidade" : ""}</small></h2>
+        <span class="pill p-pend">${atrasado ? "Pagamento em atraso" : "A pagar"}</span>
+        <h2>${M.money(val)}<small>${M.paidOf(r) > 0 ? ` de ${M.money(r.total)}` : ""}</small></h2>
         <p><b>${esc(r.sala || "")}</b> · ${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</p>
-        <p class="countdown" data-exp="${exp.toISOString()}">Pague em até <b>${hh}h ${String(mm).padStart(2, "0")}min</b> para garantir o horário (até ${M.fmtDateTime(exp)}).</p>
+        <p>Pagamento <b>${quando}</b>.</p>
         <p class="muted small">${esc(C.pagamento_texto || "")}</p>
-        <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(r.total)}.`)}">Enviar comprovante</a>
+        <div class="row-actions"><a class="btn small" target="_blank" rel="noopener" href="${wa(`Olá! Segue o comprovante da reserva ${r.codigo} (${r.sala || ""}), valor ${M.money(val)}.`)}">Enviar comprovante</a>
           <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Prefiro pagar a reserva ${r.codigo} por link de pagamento.`)}">Pedir link de pagamento</a></div>
       </div>
       ${payload ? `<div class="pc-pix"><div class="qr" data-qr="${esc(payload)}" aria-label="QR Code Pix"></div>
@@ -265,10 +265,6 @@
     if (!window.qrcode) return;
     $$("[data-qr]").forEach(el => { if (el.dataset.done) return; const q = qrcode(0, "M"); q.addData(el.dataset.qr); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); el.dataset.done = "1"; });
   }
-  setInterval(() => $$(".countdown[data-exp]").forEach(p => {
-    const left = Math.max(0, new Date(p.dataset.exp) - Date.now());
-    const b = p.querySelector("b"); if (b) b.textContent = left ? `${Math.floor(left / 36e5)}h ${String(Math.floor(left % 36e5 / 6e4)).padStart(2, "0")}min` : "prazo encerrado";
-  }), 30000);
 
   function fmtSlot(s) {
     const d = M.parse(s.data);
@@ -276,10 +272,10 @@
     return `${s.freq === "semanal" ? "Toda" : "A cada 15 dias,"} ${M.DOW_LONG[d.getDay()]}, ${s.hora_ini}h–${s.hora_fim}h (desde ${M.br(d)})`;
   }
 
-  function steps(st) {
-    const done = st === "confirmada" ? 3 : st === "pendente" ? 1 : 0;
+  function steps(st, r) {
+    const done = st === "confirmada" ? (r.total && M.dueOf(r) === 0 && r.payments ? 3 : 2) : st === "pendente" ? 1 : 0;
     const off = ["recusada", "cancelada", "expirada"].includes(st);
-    return `<ol class="steps-r ${off ? "off" : ""}">${["Pré-reserva", "Pagamento", "Confirmada"].map((t, i) => `<li class="${i < done ? "done" : i === done && !off ? "cur" : ""}">${t}</li>`).join("")}</ol>`;
+    return `<ol class="steps-r ${off ? "off" : ""}">${["Pré-reserva", "Confirmada", "Paga"].map((t, i) => `<li class="${i < done ? "done" : i === done && !off ? "cur" : ""}">${t}</li>`).join("")}</ol>`;
   }
 
   function resCard(r, guest) {
@@ -293,10 +289,10 @@
       ${canCancel ? `<button type="button" class="linkbtn danger-text" data-cancel>Cancelar reserva</button>` : ""}`;
     return `<article class="card myres st-${st}" data-id="${r.id || ""}">
       <div class="myres-head"><div><strong>${esc(r.sala || "")}</strong><span class="muted small">${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</span></div><span class="pill">${M.STATUS_CLIENTE[st]}</span></div>
-      ${steps(st)}
+      ${steps(st, r)}
       <ul class="myres-slots">${(lines.length ? lines : ["Horários a combinar com a clínica"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${r.total ? `<p class="small muted">Valor: <b>${M.money(r.total)}</b>${fixo(r) ? " por mês" : ""}${r.pago_em ? ` · pago em ${M.fmtDateTime(new Date(r.pago_em))}` : ""}</p>` : ""}
-      ${st === "expirada" ? `<p class="muted small">O prazo de pagamento passou e o horário foi liberado. Se ainda quiser, fale com a clínica ou faça uma nova reserva.</p>` : ""}
+      ${r.total ? `<p class="small muted">Valor: <b>${M.money(r.total)}</b>${!r.payments ? "" : M.dueOf(r) === 0 ? " · pago" : M.paidOf(r) > 0 ? ` · pago ${M.money(M.paidOf(r))}, falta ${M.money(M.dueOf(r))}` : ` · pagamento ${M.dueText(r)}`}</p>` : ""}
+      ${st === "pendente" ? `<p class="muted small">O horário já está separado para você. A clínica confirma pelo WhatsApp.</p>` : ""}
       ${acts.trim() ? `<div class="myres-actions">${acts}</div>` : ""}
     </article>`;
   }
@@ -314,7 +310,7 @@
   function renderPays() {
     const pays = mine.flatMap(r => (r.payments || []).map(p => ({ ...p, r }))).sort((a, b) => new Date(b.pago_em) - new Date(a.pago_em));
     $("#pay-list").innerHTML = pays.length ? `<ul class="plist">${pays.map(p => `<li>
-      <span><b>${M.money(p.valor)}</b><small>${M.fmtDateTime(new Date(p.pago_em))} · ${p.competencia ? `Mensalidade de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.r.sala || "")} · ${esc(p.forma || "")}</small></span>
+      <span><b>${M.money(p.valor)}</b><small>${M.fmtDateTime(new Date(p.pago_em))} · ${p.competencia ? `Horas antecipadas de ${MESES[M.parse(p.competencia).getMonth()]}` : "Reserva"} · ${esc(p.r.sala || "")} · ${esc(p.forma || "")}</small></span>
       <button type="button" class="btn ghost small" data-rec="${p.id}">Recibo</button></li>`).join("")}</ul>`
       : `<p class="muted">Os pagamentos confirmados pela clínica aparecem aqui, com recibo.</p>`;
     $("#pay-list").onclick = e => { const b = e.target.closest("[data-rec]"); if (b) openRecibo(pays.find(p => p.id === b.dataset.rec)); };
@@ -326,7 +322,7 @@
       <div class="rec-head"><span class="logo" aria-hidden="true"></span><div><b>Clínica Morada do Ser</b><small>${esc(C.endereco)} · ${esc(C.bairro_cidade)}</small><small>${esc(C.telefone)} · ${esc(C.email)}</small></div></div>
       <h2>Recibo</h2>
       <p>Recebemos de <b>${esc(profile.nome || r.nome || "")}</b>${(profile.cpf || r.cpf) ? `, CPF ${esc(M.cpfFormat(profile.cpf || r.cpf))}` : ""}, a quantia de <b>${M.money(p.valor)}</b>,
-      referente à locação da <b>${esc(r.sala || "")}</b> (${PLANO[r.plano]}${p.competencia ? `, mensalidade de ${MESES[M.parse(p.competencia).getMonth()]} de ${M.parse(p.competencia).getFullYear()}` : ""}).</p>
+      referente à locação da <b>${esc(r.sala || "")}</b> (${PLANO[r.plano]}${p.competencia ? `, horas de ${MESES[M.parse(p.competencia).getMonth()]} de ${M.parse(p.competencia).getFullYear()}` : ""}).</p>
       <dl class="rec-dl"><dt>Código da reserva</dt><dd>${esc(r.codigo)}</dd><dt>Data do pagamento</dt><dd>${new Date(p.pago_em).toLocaleDateString("pt-BR")}</dd><dt>Forma</dt><dd>${esc(p.forma || "—")}</dd>
       <dt>Horários</dt><dd>${(r.slots || []).map(fmtSlot).map(esc).join("<br>") || "—"}</dd></dl>
       <p class="rec-sign">Jundiaí, ${new Date(p.pago_em).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}.</p></div>`;
