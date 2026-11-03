@@ -98,6 +98,11 @@ body.admin section{padding-block:0}
 .hrow .check{min-width:72px}
 .hrow select{font:inherit;padding:.4em .6em;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
 .hrow select:disabled{opacity:.4}
+.descontos{display:flex;flex-direction:column;gap:16px}
+.desc-plano{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.desc-faixas{display:flex;flex-direction:column;gap:8px}
+.desc-faixa{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.9rem}
+.desc-faixa input{font:inherit;padding:.4em .6em;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);width:70px}
 .agenda-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .agenda-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .agenda-ctrl select{font:inherit;padding:.45em .7em;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}

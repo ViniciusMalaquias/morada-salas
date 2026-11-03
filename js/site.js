@@ -66,6 +66,7 @@
   // planos
   $("#plans").innerHTML = M.plans(C).map(p => `<article class="plan">
       ${p.off > 0 ? `<span class="off">−${p.off}%</span>` : ""}
-      <h3>${esc(p.nome)}</h3><strong>${esc(p.preco)}</strong><p>${esc(p.desc)}</p></article>`).join("");
+      <h3>${esc(p.nome)}</h3><strong>${esc(p.preco)}</strong><p>${esc(p.desc)}</p>
+      ${p.desconto ? `<small class="desconto">${esc(p.desconto)}</small>` : ""}</article>`).join("");
   $("#regras").innerHTML = (C.regras || []).map(r => `<li>${esc(r)}</li>`).join("");
 })();

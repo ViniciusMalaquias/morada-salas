@@ -45,6 +45,13 @@
     preco_antecipada: 28,      // por hora, mínimo antecipadas_min horas no mesmo mês, acerto até o dia 05
     antecipadas_min: 4,
     preco_periodo_bloco: 90,   // por período (manhã, tarde ou noite)
+    // Desconto progressivo por plano: % sobre o total da reserva, pela quantidade de horários
+    // (no período, quantidade de períodos) na MESMA pré-reserva.
+    descontos: {
+      avulso:  { ativo: false, faixas: [{ qtd: 3, pct: 5 }, { qtd: 6, pct: 10 }] },
+      pacote:  { ativo: false, faixas: [{ qtd: 3, pct: 5 }, { qtd: 6, pct: 10 }] },
+      periodo: { ativo: true,  faixas: [{ qtd: 3, pct: 5 }, { qtd: 6, pct: 10 }] }
+    },
     pix_chave: "08174363000155",
     pix_nome: "Clinica Morada do Ser",
     pix_cidade: "Jundiaí",
@@ -78,6 +85,7 @@
       { key: "preco_antecipada", label: "Horas antecipadas (R$ por hora)", type: "money" },
       { key: "antecipadas_min", label: "Horas antecipadas: mínimo de horas no mês", type: "number", min: 1, max: 100 },
       { key: "preco_periodo_bloco", label: "Período de 4h (R$ por período)", type: "money" },
+      { key: "descontos", label: "Desconto progressivo por quantidade de horários", type: "descontos", hint: "Desconto sobre o total da reserva, pela quantidade de horários (no período, de períodos) na mesma pré-reserva." },
       { key: "regras", label: "Regras de uso (uma por linha)", type: "list" }
     ]},
     { group: "Pagamento", fields: [
@@ -131,10 +139,35 @@
     const per = (C.periodos || []).map(p => `${p.nome} ${p.ini}h–${p.fim}h`).join(" · ");
     const perHora = C.preco_periodo_bloco / 4;
     return [
-      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(C.preco_avulso / 2)}), sem compromisso. Pago no dia do atendimento.`, off: 0 },
-      { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês, todas no mesmo mês. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso) },
-      { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso) }
+      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(C.preco_avulso / 2)}), sem compromisso. Pago no dia do atendimento.`, off: 0, desconto: descontoBadge(C, "avulso") },
+      { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês, todas no mesmo mês. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso), desconto: descontoBadge(C, "pacote") },
+      { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso), desconto: descontoBadge(C, "periodo") }
     ];
+  }
+
+  // ---------- desconto progressivo ----------
+  // faixas ativas do plano, ordenadas pela quantidade
+  function descontoFaixas(C, plano) {
+    const d = (C.descontos || {})[plano];
+    return d && d.ativo ? (d.faixas || []).slice().sort((a, b) => a.qtd - b.qtd) : [];
+  }
+  // % da maior faixa atingida com qtd horários (0 se o desconto estiver desativado)
+  function descontoPct(C, plano, qtd) {
+    let p = 0;
+    descontoFaixas(C, plano).forEach(f => { if (qtd >= f.qtd && f.pct > p) p = f.pct; });
+    return p;
+  }
+  // próxima faixa ainda não alcançada: { falta, pct } ou null
+  function descontoProx(C, plano, qtd) {
+    const atual = descontoPct(C, plano, qtd);
+    const prox = descontoFaixas(C, plano).find(f => f.qtd > qtd && f.pct > atual);
+    return prox ? { falta: prox.qtd - qtd, pct: prox.pct } : null;
+  }
+  // selo para a vitrine de planos, ex.: "Leve 3, ganhe 5% · 6+ 10%"
+  function descontoBadge(C, plano) {
+    const faixas = descontoFaixas(C, plano);
+    if (!faixas.length) return "";
+    return faixas.map((f, i) => i === 0 ? `Leve ${f.qtd}, ganhe ${f.pct}%` : `${f.qtd}+ ${f.pct}%`).join(" · ");
   }
 
   // Quando pagar cada plano
@@ -276,6 +309,7 @@
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
     money, pct, plans, semanalRate, dueText, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
+    descontoFaixas, descontoPct, descontoProx, descontoBadge,
     pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
   };

@@ -261,6 +261,28 @@
       });
       w.querySelector(".linkbtn").addEventListener("click", () => { w.dataset.value = ""; paint(); $("#textos-status").textContent = "Alterações não salvas."; });
     }
+    if (fd.type === "descontos") {
+      const PLANOS = [["avulso", "Hora avulsa", "horários"], ["pacote", "Horas antecipadas", "horários"], ["periodo", "Período de 4h", "períodos"]];
+      w.innerHTML = `${label}${hint}<div class="descontos"></div>`;
+      const box = w.querySelector(".descontos");
+      PLANOS.forEach(([id, nome, unidade]) => {
+        const d = (val || {})[id] || { ativo: false, faixas: [] };
+        const sec = document.createElement("div"); sec.className = "desc-plano"; sec.dataset.plano = id;
+        sec.innerHTML = `<label class="check"><input type="checkbox" class="desc-ativo" ${d.ativo ? "checked" : ""}> Desconto ativo — ${nome}</label>
+          <div class="desc-faixas"></div><button type="button" class="linkbtn desc-add">+ Adicionar faixa</button>`;
+        const faixasBox = sec.querySelector(".desc-faixas");
+        const addFaixa = (f = { qtd: 3, pct: 5 }) => {
+          const row = document.createElement("div"); row.className = "desc-faixa";
+          row.innerHTML = `<span>a partir de</span><input type="number" class="f-qtd" min="2" step="1" aria-label="Quantidade de ${unidade}"><span>${unidade} →</span><input type="number" class="f-pct" min="1" max="50" step="1" aria-label="Percentual de desconto"><span>%</span><button type="button" class="icon f-del" aria-label="Remover faixa">✕</button>`;
+          row.querySelector(".f-qtd").value = f.qtd; row.querySelector(".f-pct").value = f.pct;
+          row.querySelector(".f-del").onclick = () => { row.remove(); $("#textos-status").textContent = "Alterações não salvas."; };
+          faixasBox.appendChild(row);
+        };
+        (d.faixas || []).forEach(addFaixa);
+        sec.querySelector(".desc-add").onclick = () => { addFaixa(); $("#textos-status").textContent = "Alterações não salvas."; };
+        box.appendChild(sec);
+      });
+    }
     if (fd.type === "pairs") {
       w.innerHTML = `<label>${fd.label}</label><div class="pairs"></div><button type="button" class="linkbtn">+ Adicionar item</button>`;
       const box = w.querySelector(".pairs"), addBtn = w.querySelector(".linkbtn");
@@ -288,6 +310,16 @@
     if (t === "days") return [...w.querySelectorAll("input:checked")].map(i => i.value);
     if (t === "image") return w.dataset.value || "";
     if (t === "pairs") return [...w.querySelectorAll(".pair")].map(r => ({ titulo: r.querySelector("input").value.trim(), texto: r.querySelector("textarea").value.trim() })).filter(p => p.titulo || p.texto);
+    if (t === "descontos") {
+      const out = {};
+      w.querySelectorAll(".desc-plano").forEach(sec => {
+        out[sec.dataset.plano] = {
+          ativo: sec.querySelector(".desc-ativo").checked,
+          faixas: [...sec.querySelectorAll(".desc-faixa")].map(r => ({ qtd: Number(r.querySelector(".f-qtd").value), pct: Number(r.querySelector(".f-pct").value) }))
+        };
+      });
+      return out;
+    }
   }
 
   $("#f-textos").addEventListener("submit", async e => {
@@ -303,6 +335,15 @@
     for (const k of ["preco_avulso", "preco_antecipada", "antecipadas_min", "preco_periodo_bloco"])
       if (!(get(k) > 0)) return toast("Preencha todos os preços com valores maiores que zero.", true);
     if (per.some(p => p.fim - p.ini !== 4)) return toast("Cada período precisa ter 4 horas (ex.: Tarde 13-17), porque o preço é por período de 4h.", true);
+    const descontos = get("descontos") || {};
+    for (const d of Object.values(descontos)) {
+      const qtds = new Set();
+      for (const f of d.faixas || []) {
+        if (!(f.qtd >= 2) || !(f.pct > 0 && f.pct <= 50)) return toast("Desconto: a quantidade mínima é 2 e o percentual precisa ser entre 1% e 50%.", true);
+        if (qtds.has(f.qtd)) return toast("Desconto: não repita a mesma quantidade de horários numa faixa do mesmo plano.", true);
+        qtds.add(f.qtd);
+      }
+    }
     const { error } = await sb.from("site_content").upsert(rows);
     if (error) return fail("Erro ao salvar textos", error);
     $("#textos-status").textContent = "Tudo salvo."; toast("Textos salvos. O site já mostra a versão nova.");

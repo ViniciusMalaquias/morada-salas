@@ -73,7 +73,9 @@ Deno.serve(async (req) => {
   const tr = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
   const send = (to: string, subject: string, html: string, text: string) =>
     tr.sendMail({ from: `"Clínica Morada do Ser" <${user}>`, to, subject, html, text, replyTo: "clinica.moradadoser@gmail.com" });
-  const SEL = "id,codigo,nome,email,plano,status,total,forma_escolhida,link_pagamento,created_at,decided_at,aceite_em,email_pedido_em,email_confirmada_em,rooms(name),reservation_slots(data,hora_ini,hora_fim),payments(valor)";
+  const SEL = "id,codigo,nome,email,plano,status,total,desconto_pct,forma_escolhida,link_pagamento,created_at,decided_at,aceite_em,email_pedido_em,email_confirmada_em,rooms(name),reservation_slots(data,hora_ini,hora_fim),payments(valor)";
+  const descLine = (r: any) => Number(r.desconto_pct || 0) > 0 ? `Desconto aplicado: ${Number(r.desconto_pct)}%<br>` : "";
+  const descTxt = (r: any) => Number(r.desconto_pct || 0) > 0 ? `Desconto aplicado: ${Number(r.desconto_pct)}%\n` : "";
   const ord = (a: any, b: any) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini;
 
   // ---------- pré-reserva recebida ----------
@@ -89,9 +91,9 @@ Deno.serve(async (req) => {
       await send(r.email, `Recebemos sua pré-reserva · ${r.rooms?.name || "Morada do Ser"}`,
         layout({ pre: "Seu horário está separado. A clínica confirma em até 2 horas.", titulo: "Recebemos sua pré-reserva",
           corpo: `Olá, ${esc(first(r.nome))}! Seu horário já está separado. A clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento.`,
-          extra: detalhes(r, slots) + box(`Valor: <b>${money(r.total)}</b>, a pagar ${dueText(r)}<br>Forma de pagamento: ${pag}`),
+          extra: detalhes(r, slots) + box(`${descLine(r)}Valor: <b>${money(r.total)}</b>, a pagar ${dueText(r)}<br>Forma de pagamento: ${pag}`),
           botao: ["Acompanhar a reserva", SITE + "conta.html"] }),
-        `Recebemos sua pré-reserva (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\nValor: ${money(r.total)}, a pagar ${dueText(r)} (${pag}).\nA clínica confirma pelo WhatsApp em até 2 horas.\nAcompanhe em ${SITE}conta.html`);
+        `Recebemos sua pré-reserva (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\n${descTxt(r)}Valor: ${money(r.total)}, a pagar ${dueText(r)} (${pag}).\nA clínica confirma pelo WhatsApp em até 2 horas.\nAcompanhe em ${SITE}conta.html`);
     } catch (e) { await sb.from("reservations").update({ email_pedido_em: null }).eq("id", id); console.error("pedido", String(e)); return json({ error: "envio" }, 502); }
     return json({ ok: true });
   }
@@ -126,8 +128,8 @@ Deno.serve(async (req) => {
       await send(r.email, `Reserva confirmada · ${r.rooms?.name || "Morada do Ser"} · ${slots[0] ? fmtSlot(slots[0]) : ""}`,
         layout({ pre: "Sua reserva na Clínica Morada do Ser está confirmada.", titulo: "Sua reserva está confirmada",
           corpo: `Olá, ${esc(first(r.nome))}! Está tudo certo: a sala é sua no horário abaixo. Na véspera, mandamos um lembrete.`,
-          extra: detalhes(r, slots) + box(pagHtml), botao: ["Ver minha reserva", SITE + "conta.html"] }),
-        `Sua reserva está confirmada (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\n${pagTxt}\nEndereço: Rua Adolfo Torricelli, 284, Vianelo, Jundiaí`);
+          extra: detalhes(r, slots) + box(descLine(r) + pagHtml), botao: ["Ver minha reserva", SITE + "conta.html"] }),
+        `Sua reserva está confirmada (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\n${descTxt(r)}${pagTxt}\nEndereço: Rua Adolfo Torricelli, 284, Vianelo, Jundiaí`);
     } catch (e) { await sb.from("reservations").update({ email_confirmada_em: null }).eq("id", id); console.error("confirmada", String(e)); return json({ error: "envio" }, 502); }
     return json({ ok: true });
   }

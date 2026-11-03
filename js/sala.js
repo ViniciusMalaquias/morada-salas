@@ -62,7 +62,7 @@
   $("#plan-pick").innerHTML = plans.map(p => `
     <label class="pick"><input type="radio" name="plano" value="${p.id}">
       <span class="pick-body"><span class="pick-top"><b>${esc(p.nome)}</b>${p.off > 0 ? `<span class="off">−${p.off}%</span>` : ""}</span>
-      <strong>${esc(p.preco)}</strong><small>${esc(p.desc)}</small></span></label>`).join("");
+      <strong>${esc(p.preco)}</strong><small>${esc(p.desc)}</small>${p.desconto ? `<small class="desconto">${esc(p.desconto)}</small>` : ""}</span></label>`).join("");
   document.querySelectorAll('input[name="plano"]').forEach(r => r.addEventListener("change", () => {
     plan = r.value; sel.clear(); occ = {};
     $("#step-time").hidden = false; $("#step-data").hidden = false;
@@ -259,6 +259,16 @@
         const next = hours < 4 ? [4, C.semanal_4] : hours < 8 ? [8, C.semanal_8] : null;
         if (next && next[1] < rate) priceLines.push(`Com ${next[0]}h por semana, a hora cai para ${M.money(next[1])}.`);
       }
+    }
+    if (m === "hora" || m === "periodo") {
+      const n = slots.length, unidade = plan === "periodo" ? "período" : "horário";
+      const descPct = M.descontoPct(C, plan, n);
+      if (descPct > 0) {
+        total = Math.round(total * (1 - descPct / 100) * 100) / 100;
+        priceLines.push(`Desconto de ${descPct}% (${n} ${unidade}${n > 1 ? "s" : ""})`);
+      }
+      const prox = M.descontoProx(C, plan, n);
+      if (prox) priceLines.push(`Com mais ${prox.falta} ${unidade}${prox.falta > 1 ? "s" : ""}, o desconto vira ${prox.pct}%.`);
     }
     const planObj = plans.find(p => p.id === plan);
     const totalLabel = mode() === "fixo" ? "Estimativa por mês" : "Total";

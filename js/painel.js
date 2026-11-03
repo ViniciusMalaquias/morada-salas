@@ -378,7 +378,7 @@
           <dt>Sala</dt><dd>${esc(roomName(r.room_id))}</dd>
           <dt>Plano</dt><dd>${PLANO[r.plano]}</dd>
           <dt>Horários</dt><dd><ul class="ul">${(slotsText(r).length ? slotsText(r) : ["A combinar"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul></dd>
-          ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${r.total && M.dueOf(r) > 0 ? ` · em aberto ${M.money(M.dueOf(r))} (${atrasado(r) ? "atrasado" : M.dueText(r)})` : r.total ? " · pago" : ""}</dd>`}
+          ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${r.desconto_pct > 0 ? ` <span class="tag">−${r.desconto_pct}% desconto</span>` : ""}${r.total && M.dueOf(r) > 0 ? ` · em aberto ${M.money(M.dueOf(r))} (${atrasado(r) ? "atrasado" : M.dueText(r)})` : r.total ? " · pago" : ""}</dd>`}
           <dt>Pedido em</dt><dd>${M.fmtDateTime(new Date(r.created_at))}</dd>
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>
