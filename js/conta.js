@@ -341,7 +341,7 @@
     if (mc.sel.has(h)) { mc.sel.delete(h); mc.lastTap = null; mcErr(""); return mcDraw(); }
     const add = [h];
     // tocar no início e depois no fim preenche o intervalo (só horários livres)
-    if (mc.lastTap != null && h > mc.lastTap + 0.5 && mc.sel.has(mc.lastTap)) {
+    if (mc.lastTap != null && h >= mc.lastTap + 1.5 && mc.sel.has(mc.lastTap)) {
       const gap = []; for (let x = mc.lastTap + 0.5; x < h; x += 0.5) gap.push(x);
       if (gap.every(x => mcState(d, x) === "free")) add.push(...gap);
     }

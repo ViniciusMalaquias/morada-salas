@@ -104,7 +104,7 @@
     $("#weeknav").hidden = m === "fixo";
     $("#time-title").textContent = m === "fixo" ? "Escolha seus horários fixos" : m === "periodo" ? "Escolha os períodos" : "Escolha os horários";
     $("#time-hint").textContent =
-      plan === "avulso" ? "Cada quadrinho é meia hora. Toque no horário de início e depois no último quadrinho: o intervalo é marcado sozinho." :
+      plan === "avulso" ? "Cada quadrinho é meia hora. Toque em cada meia hora que quer usar (toque de novo para desmarcar). Para um intervalo longo, toque no início e no último quadrinho." :
       plan === "pacote" ? `Cada quadrinho é meia hora (toque no início e no fim para marcar o intervalo). Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.` :
       plan === "periodo" ? `Toque nos períodos que quer reservar. Cada período de 4h sai ${M.money(C.preco_periodo_bloco)}.` :
       plan === "semanal" ? "Toque nas horas que vão se repetir toda semana. Quanto mais horas por semana, menor o valor da hora." :
@@ -225,7 +225,7 @@
   $("#cal").addEventListener("click", e => {
     const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
     const k = b.dataset.k;
-    if (sel.has(k)) sel.delete(k);
+    if (sel.has(k)) { sel.delete(k); lastTap = null; }
     else {
       if (plan === "pacote" && sel.size) {
         const mes = k => k.split("|")[0].slice(0, 7), first = mes([...sel][0]);
@@ -234,7 +234,7 @@
       sel.add(k);
       // tocar no início e depois no fim preenche o intervalo (só horários livres, mesmo dia)
       const [col, hs] = k.split("|"), h = +hs;
-      if (mode() === "hora" && lastTap && lastTap.col === col && h > lastTap.h + 0.5 && sel.has(`${col}|${lastTap.h}`)) {
+      if (mode() === "hora" && lastTap && lastTap.col === col && h >= lastTap.h + 1.5 && sel.has(`${col}|${lastTap.h}`)) {
         const c = columns().find(x => x.key === col), gap = [];
         for (let x = lastTap.h + 0.5; x < h; x += 0.5) gap.push(x);
         if (c && gap.every(x => stateHour(c, x) === "free")) gap.forEach(x => sel.add(`${col}|${x}`));
