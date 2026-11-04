@@ -148,3 +148,15 @@ fieldset.forma legend{font-weight:600;font-size:.92rem;margin-bottom:8px;padding
 .cal:not(.one):not(.periods) .cell{height:22px}
 .cal:not(.one) tr.full td{padding-top:3px}
 .cal.one .cell{height:38px}
+
+/* Horas antecipadas: escolher agora ou banco de horas */
+.cal-area{display:flex;flex-direction:column;gap:14px;min-width:0}
+.cal-area[hidden]{display:none}
+.pac-mode{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pac-mode[hidden]{display:none}
+.banco-box{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end}
+.banco-box[hidden]{display:none}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper input{text-align:center;font-variant-numeric:tabular-nums}
+.stepper .icon{flex:none;width:42px;height:42px;font-size:1.2rem}
+@media (max-width:560px){.pac-mode,.banco-box{grid-template-columns:1fr}}

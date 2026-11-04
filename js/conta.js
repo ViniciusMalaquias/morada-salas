@@ -7,6 +7,7 @@
   const PLANO = { avulso: "Hora avulsa", pacote: "Horas antecipadas", periodo: "Período de 4h", semanal: "Fixo semanal", quinzenal: "Fixo quinzenal" };
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fixo = r => r.plano === "semanal" || r.plano === "quinzenal";
+  const planoTxt = r => r.usa_banco_de ? "Banco de horas" : M.isCompraBanco(r) ? "Horas antecipadas · banco de horas" : (PLANO[r.plano] || "");
 
   let toastTimer;
   const toast = (msg, isErr) => { const t = $("#toast"); t.textContent = msg; t.classList.toggle("error", !!isErr); t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, isErr ? 6000 : 3000); };
@@ -120,12 +121,12 @@
   let mine = [];
   async function loadMine() {
     const { data, error } = await sb.from("reservations")
-      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,room_id,nome,cpf,forma_escolhida,link_pagamento,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim),payments(id,competencia,valor,forma,pago_em)")
+      .select("id,codigo,status,plano,resumo,total,created_at,pago_em,room_id,nome,cpf,forma_escolhida,link_pagamento,horas_compradas,mes_referencia,usa_banco_de,rooms(name),reservation_slots(freq,data,hora_ini,hora_fim),payments(id,competencia,valor,forma,pago_em)")
       .eq("user_id", me.id).order("created_at", { ascending: false }).limit(200);
     const box = $("#my-list");
     if (error) { box.innerHTML = `<p class="err">Não foi possível carregar suas reservas.</p>`; return; }
     mine = (data || []).map(r => ({ ...r, sala: r.rooms?.name, slots: r.reservation_slots }));
-    renderHero(); renderPend(); renderList(); renderAgenda(); renderPays();
+    renderHero(); renderPend(); renderList(); renderAgenda(); renderPays(); loadBanco();
   }
 
   const atH = (y, m, d, h) => new Date(y, m, d, Math.floor(h), Math.round((h % 1) * 60));
@@ -161,7 +162,7 @@
     $("#hero-next").innerHTML = `<div class="hero-next">
       <div class="hn-date"><span>${M.DOW_NAME[at.getDay()]}</span><strong>${at.getDate()}</strong><span>${MESES[at.getMonth()].slice(0, 3)}</span></div>
       <div class="hn-body"><span class="eyebrow">Próximo atendimento · ${relDay(at)}</span>
-        <h2>${esc(r.sala)}</h2><p>${M.hh(s.hora_ini)} às ${M.hh(s.hora_fim)} · ${PLANO[r.plano] || ""}</p></div>
+        <h2>${esc(r.sala)}</h2><p>${M.hh(s.hora_ini)} às ${M.hh(s.hora_fim)} · ${planoTxt(r)}</p></div>
       <div class="hn-act"><a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Sobre minha reserva ${r.codigo} (${r.sala}), ${M.DOW_NAME[at.getDay()]} ${M.br(at)} às ${M.hh(s.hora_ini)}:`)}">Falar com a clínica</a></div></div>`;
   }
 
@@ -211,7 +212,7 @@
       const pend = r.status !== "confirmada";
       html += `<div class="ag-item${pend ? " pend" : ""}">
         <span class="ag-time">${M.hh(s.hora_ini)}<small>${M.hh(s.hora_fim)}</small></span>
-        <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[PLANO[r.plano], s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando confirmação" : ""].filter(Boolean).join(" · ")}</small></span>
+        <span class="ag-body"><b>${esc(r.sala || "")}</b><small>${[planoTxt(r), s.freq === "semanal" ? "toda semana" : s.freq === "quinzenal" ? "a cada 15 dias" : "", pend ? "aguardando confirmação" : ""].filter(Boolean).join(" · ")}</small></span>
         <a class="linkbtn ag-g" target="_blank" rel="noopener" href="${esc(gcalLink(r, s, s.freq === "unica" ? s.data : M.iso(d)))}" title="${s.freq !== "unica" ? "Adiciona a série inteira" : "Adiciona este horário"}">+ Google Agenda</a>
       </div>`;
     });
@@ -237,6 +238,133 @@
   }
   $("#ag-ics").addEventListener("click", downloadIcs);
 
+  // ---------- Banco de horas ----------
+  const firstOfMonth = d => M.iso(new Date(d.getFullYear(), d.getMonth(), 1));
+  const durZ = h => h > 0 ? M.dur(h) : "0h";
+  let bancos = [], rooms = null;
+  async function loadBanco() {
+    const atual = firstOfMonth(new Date());
+    const meses = [...new Set(mine.filter(r => M.isCompraBanco(r) && ["pendente", "confirmada"].includes(r.status) && r.mes_referencia >= atual).map(r => r.mes_referencia))].sort();
+    const res = await Promise.all(meses.map(m => sb.rpc("banco_horas_resumo", { p_user: me.id, p_mes: m })));
+    bancos = meses.map((mes, i) => ({ mes, ...(res[i].data || {}) }));
+    renderBanco();
+  }
+  function renderBanco() {
+    $("#banco-box").innerHTML = bancos.map(b => {
+      const n = v => Number(v || 0);
+      const usos = mine.filter(r => r.usa_banco_de && ["pendente", "confirmada"].includes(r.status))
+        .flatMap(r => (r.slots || []).filter(s => s.data.slice(0, 7) === b.mes.slice(0, 7)).map(s => ({ r, s })))
+        .sort((x, y) => x.s.data.localeCompare(y.s.data) || x.s.hora_ini - y.s.hora_ini);
+      const [y, m] = b.mes.split("-").map(Number), ultimo = new Date(y, m, 0);
+      const temConf = n(b.compradas) > 0 || n(b.ajustes) > 0, saldo = n(b.saldo);
+      const pode = temConf && saldo >= 0.5 && ultimo >= new Date(new Date().setHours(0, 0, 0, 0));
+      return `<article class="card bh-card${temConf ? "" : " pend"}">
+        <div class="bh-head"><div><span class="eyebrow">Banco de horas · ${esc(M.mesNome(b.mes))}</span>
+          <h2>${temConf ? durZ(saldo) : "Aguardando"}<small>${temConf ? "de saldo" : "confirmação da clínica"}</small></h2></div>
+          ${temConf ? `<button type="button" class="btn small" data-marcar="${b.mes}" ${pode ? "" : "disabled"}>Marcar horário</button>` : ""}</div>
+        ${temConf ? `<div class="bh-nums"><span>Compradas <b>${durZ(n(b.compradas))}</b></span><span>Usadas <b>${durZ(n(b.usadas))}</b></span>${n(b.ajustes) ? `<span>Ajustes da clínica <b>${n(b.ajustes) > 0 ? "+" : "−"}${M.dur(Math.abs(n(b.ajustes)))}</b></span>` : ""}</div>` : ""}
+        ${n(b.pendentes) > 0 ? `<p class="muted small">Compra de ${M.dur(n(b.pendentes))} aguardando a confirmação da clínica${temConf ? " (entra no saldo quando for confirmada)" : ""}.</p>` : ""}
+        ${usos.length ? `<ul class="bh-usos">${usos.map(({ r, s }) => `<li>${esc(fmtSlot(s))} · ${esc(r.sala || "")}</li>`).join("")}</ul>` : ""}
+        <p class="muted small">As horas valem até ${M.br(ultimo)}, em qualquer sala. Horas não usadas não passam para o mês seguinte.${temConf && saldo < 0.5 ? " Saldo do mês esgotado." : ""}</p>
+      </article>`;
+    }).join("");
+  }
+  $("#banco-box").addEventListener("click", e => { const b = e.target.closest("[data-marcar]"); if (b && !b.disabled) openMarcar(b.dataset.marcar); });
+
+  // Marcar horário com o saldo: sala → dia do mês → horários livres de 30 em 30 min (occupied_slots2, como na página da sala)
+  const HOR = () => C.horarios || M.DEFAULTS.horarios;
+  const openOf = d => HOR()[M.DOW_NAME[d.getDay()]] || null;
+  const mc = { mes: null, saldo: 0, room: null, day: null, sel: new Set(), occ: {}, lastTap: null, loading: false };
+  const mcErr = msg => err("#mc-err", msg || "");
+  async function openMarcar(mes) {
+    const b = bancos.find(x => x.mes === mes); if (!b) return;
+    if (!rooms) { try { rooms = await M.loadRooms(); } catch (e) { return toast("Não foi possível carregar as salas.", true); } }
+    if (!rooms.length) return toast("Nenhuma sala disponível no momento.", true);
+    Object.assign(mc, { mes, saldo: Number(b.saldo || 0), room: mc.room && rooms.some(r => r.id === mc.room) ? mc.room : rooms[0].id, day: null, sel: new Set(), lastTap: null });
+    $("#mc-title").textContent = `Marcar horário · ${M.mesNome(mes)}`;
+    $("#mc-saldo").textContent = `Saldo disponível: ${M.dur(mc.saldo)}. As horas marcadas saem do seu banco de horas.`;
+    $("#mc-sala").innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === mc.room ? "selected" : ""}>${esc(r.name)}</option>`).join("");
+    mcErr(""); $("#marcar").hidden = false;
+    await mcLoad();
+  }
+  function mcDays() {
+    const [y, m] = mc.mes.split("-").map(Number), today = new Date(new Date().setHours(0, 0, 0, 0)), out = [];
+    for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d = M.addDays(d, 1)) if (d >= today && openOf(d)) out.push(new Date(d));
+    return out;
+  }
+  function mcState(d, h) {
+    const o = openOf(d), key = M.iso(d), now = new Date();
+    if (!o || h < o[0] || h >= o[1]) return "closed";
+    if (key < M.iso(now) || (key === M.iso(now) && h <= now.getHours() + now.getMinutes() / 60)) return "past";
+    if (mc.occ[key]?.has(h)) return "busy";
+    return mc.sel.has(h) ? "sel" : "free";
+  }
+  function mcFree(d) { const o = openOf(d); let n = 0; if (o) for (let h = o[0]; h < o[1]; h += 0.5) if (mcState(d, h) === "free") n++; return n; }
+  async function mcLoad() {
+    const days = mcDays();
+    mc.loading = true; mcDraw();
+    try { mc.occ = days.length ? await M.loadOccupied(mc.room, days[0], days[days.length - 1]) : {}; }
+    catch (e) { console.error(e); mcErr("Não foi possível carregar os horários. Tente de novo."); }
+    mc.loading = false;
+    if (!mc.day || !days.some(d => M.iso(d) === mc.day)) { const f = days.find(d => mcFree(d) > 0) || days[0]; mc.day = f ? M.iso(f) : null; }
+    mcDraw();
+  }
+  function mcDraw() {
+    const days = mcDays();
+    $("#mc-dias").innerHTML = days.map(d => {
+      const k = M.iso(d), f = mc.loading ? 0 : mcFree(d);
+      const info = mc.loading ? "…" : k === mc.day && mc.sel.size ? `✓ ${M.dur(mc.sel.size / 2)}` : f ? `${M.dur(f / 2)} livres` : "lotado";
+      return `<button type="button" role="tab" data-day="${k}" aria-selected="${k === mc.day}" class="${f || mc.loading ? "" : "full"}"><b>${M.DOW_NAME[d.getDay()]}</b><small>${M.br(d)}</small><span>${info}</span></button>`;
+    }).join("") || `<p class="muted small">Não há mais dias de funcionamento neste mês.</p>`;
+    $("#mc-dias [aria-selected=true]")?.scrollIntoView({ block: "nearest", inline: "center" });
+    const cal = $("#mc-cal");
+    if (mc.loading) cal.innerHTML = `<tbody><tr><td class="muted small">Carregando horários…</td></tr></tbody>`;
+    else if (!mc.day) cal.innerHTML = "";
+    else {
+      const d = M.parse(mc.day), o = openOf(d); let html = "<tbody>";
+      for (let h = o[0]; h < o[1]; h += 0.5) {
+        const st = mcState(d, h);
+        const txt = { free: "Livre", sel: "✓ Escolhido", busy: "Ocupado", past: "Já passou" }[st] || "";
+        html += `<tr class="${h % 1 ? "half" : "full"}"><th scope="row">${M.hh(h)}</th><td><button type="button" class="cell ${st}" data-h="${h}" ${st === "free" || st === "sel" ? "" : "disabled"} aria-pressed="${st === "sel"}" aria-label="${M.hh(h)} às ${M.hh(h + 0.5)}: ${txt}">${txt}</button></td></tr>`;
+      }
+      cal.innerHTML = html + "</tbody>";
+    }
+    const hrs = mc.sel.size / 2;
+    $("#mc-sel").innerHTML = hrs ? `${M.ranges([...mc.sel]).map(([a, b]) => `${M.hh(a)}–${M.hh(b)}`).join(", ")} · <b>${M.dur(hrs)}</b> · saldo depois: ${durZ(mc.saldo - hrs)}` : "";
+    $("#mc-ok").disabled = !hrs || hrs > mc.saldo;
+  }
+  $("#mc-sala").addEventListener("change", e => { mc.room = e.target.value; mc.sel.clear(); mc.lastTap = null; mcErr(""); mcLoad(); });
+  $("#mc-dias").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (!b) return; mc.day = b.dataset.day; mc.sel.clear(); mc.lastTap = null; mcErr(""); mcDraw(); });
+  $("#mc-cal").addEventListener("click", e => {
+    const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
+    const h = +b.dataset.h, d = M.parse(mc.day);
+    if (mc.sel.has(h)) { mc.sel.delete(h); mc.lastTap = null; mcErr(""); return mcDraw(); }
+    const add = [h];
+    // tocar no início e depois no fim preenche o intervalo (só horários livres)
+    if (mc.lastTap != null && h > mc.lastTap + 0.5 && mc.sel.has(mc.lastTap)) {
+      const gap = []; for (let x = mc.lastTap + 0.5; x < h; x += 0.5) gap.push(x);
+      if (gap.every(x => mcState(d, x) === "free")) add.push(...gap);
+    }
+    if ((mc.sel.size + add.length) / 2 > mc.saldo) return mcErr(`Seu saldo é de ${M.dur(mc.saldo)}. Escolha menos horários.`);
+    add.forEach(x => mc.sel.add(x)); mc.lastTap = h; mcErr(""); mcDraw();
+  });
+  $("#mc-ok").addEventListener("click", async () => {
+    const btn = $("#mc-ok"); btn.disabled = true; btn.textContent = "Marcando…";
+    const slots = M.ranges([...mc.sel]).map(([a, b]) => ({ data: mc.day, hora_ini: a, hora_fim: b }));
+    const { data, error } = await sb.rpc("usar_banco_horas", { p_room: mc.room, p_slots: slots });
+    btn.textContent = "Marcar horário";
+    if (error) {
+      mcErr(error.message || "Não foi possível marcar. Tente de novo."); btn.disabled = false;
+      if (/reservado/.test(error.message || "")) { mc.sel.clear(); mcLoad(); }
+      return;
+    }
+    $("#marcar").hidden = true;
+    toast(`Horário marcado! Saldo de ${M.mesNome(mc.mes)}: ${durZ(Number(data.saldo))}.`);
+    loadMine();
+  });
+  $("#marcar").addEventListener("click", e => { if (e.target.closest("[data-close-mc]")) $("#marcar").hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $("#marcar").hidden = true; });
+
   // Cartões de pagamento: reservas confirmadas com valor em aberto
   function renderPend() {
     const due = mine.filter(r => r.status === "confirmada" && M.dueOf(r) > 0);
@@ -252,7 +380,7 @@
       <div class="pc-info">
         <span class="pill p-pend">${atrasado ? "Pagamento em atraso" : "A pagar"}</span>
         <h2>${M.money(val)}<small>${M.paidOf(r) > 0 ? ` de ${M.money(r.total)}` : ""}</small></h2>
-        <p><b>${esc(r.sala || "")}</b> · ${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</p>
+        <p><b>${M.isCompraBanco(r) ? `Banco de horas: ${M.dur(r.horas_compradas)} para ${esc(M.mesNome(r.mes_referencia))}` : esc(r.sala || "")}</b> · ${planoTxt(r)} · código ${esc(r.codigo)}</p>
         <p>Pagamento <b>${quando}</b>, ${isLink ? "com cartão de crédito (link de pagamento)" : "por Pix"}.</p>
         ${isLink
           ? (/^https?:\/\//i.test(r.link_pagamento || "")
@@ -281,26 +409,29 @@
   }
 
   function steps(st, r) {
-    const done = st === "confirmada" ? (r.total && M.dueOf(r) === 0 && r.payments ? 3 : 2) : st === "pendente" ? 1 : 0;
+    const done = st === "confirmada" ? (r.usa_banco_de || (r.total && M.dueOf(r) === 0 && r.payments) ? 3 : 2) : st === "pendente" ? 1 : 0;
     const off = ["recusada", "cancelada", "expirada"].includes(st);
     return `<ol class="steps-r ${off ? "off" : ""}">${["Pré-reserva", "Confirmada", "Paga"].map((t, i) => `<li class="${i < done ? "done" : i === done && !off ? "cur" : ""}">${t}</li>`).join("")}</ol>`;
   }
 
   function resCard(r, guest) {
     const st = M.statusOf(r, C);
-    const lines = r.slots ? r.slots.slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot)
+    const compra = M.isCompraBanco(r);
+    const lines = compra ? [`Banco de horas: ${M.dur(r.horas_compradas)} para usar em ${M.mesNome(r.mes_referencia)}`, st === "confirmada" ? "Marque os horários no card Banco de horas, acima." : "Depois que a clínica confirmar, você marca os horários aqui em Minha conta."]
+      : r.slots ? r.slots.slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini).map(fmtSlot)
       : String(r.resumo || "").split("\n").filter(l => l && !/^Plano:|^Total|^Estimativa/.test(l));
-    const canCancel = !guest && (st === "pendente" || st === "confirmada");
+    const canCancel = !guest && (st === "pendente" || (st === "confirmada" && !compra));
     const acts = guest ? "" : `
       ${r.room_id ? `<a class="btn ghost small" href="sala.html?id=${encodeURIComponent(r.room_id)}">Reservar de novo</a>` : ""}
       ${r.status === "confirmada" ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Gostaria de remarcar um horário da reserva ${r.codigo} (${r.sala || ""}).`)}">Pedir remarcação</a>` : ""}
       ${canCancel ? `<button type="button" class="linkbtn danger-text" data-cancel>Cancelar reserva</button>` : ""}`;
     return `<article class="card myres st-${st}" data-id="${r.id || ""}">
-      <div class="myres-head"><div><strong>${esc(r.sala || "")}</strong><span class="muted small">${PLANO[r.plano] || ""} · código ${esc(r.codigo)}</span></div><span class="pill">${M.STATUS_CLIENTE[st]}</span></div>
+      <div class="myres-head"><div><strong>${esc(compra ? `Banco de horas · ${M.mesNome(r.mes_referencia)}` : r.sala || "")}</strong><span class="muted small">${planoTxt(r)} · código ${esc(r.codigo)}</span></div><span class="pill">${M.STATUS_CLIENTE[st]}</span></div>
       ${steps(st, r)}
       <ul class="myres-slots">${(lines.length ? lines : ["Horários a combinar com a clínica"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
       ${r.total ? `<p class="small muted">Valor: <b>${M.money(r.total)}</b>${!r.payments ? "" : M.dueOf(r) === 0 ? " · pago" : M.paidOf(r) > 0 ? ` · pago ${M.money(M.paidOf(r))}, falta ${M.money(M.dueOf(r))}` : ` · pagamento ${M.dueText(r)}`}</p>` : ""}
       ${st === "pendente" ? `<p class="muted small">O horário já está separado para você. A clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento.</p>` : ""}
+      ${r.usa_banco_de && st === "confirmada" ? `<p class="muted small">Marcado com o banco de horas. Cancelando com mais de 24h, as horas voltam para o seu saldo.</p>` : ""}
       ${acts.trim() ? `<div class="myres-actions">${acts}</div>` : ""}
     </article>`;
   }
@@ -332,7 +463,7 @@
       <p>Recebemos de <b>${esc(profile.nome || r.nome || "")}</b>${(profile.cpf || r.cpf) ? `, CPF ${esc(M.cpfFormat(profile.cpf || r.cpf))}` : ""}, a quantia de <b>${M.money(p.valor)}</b>,
       referente à locação da <b>${esc(r.sala || "")}</b> (${PLANO[r.plano]}${p.competencia ? `, horas de ${MESES[M.parse(p.competencia).getMonth()]} de ${M.parse(p.competencia).getFullYear()}` : ""}).</p>
       <dl class="rec-dl"><dt>Código da reserva</dt><dd>${esc(r.codigo)}</dd><dt>Data do pagamento</dt><dd>${new Date(p.pago_em).toLocaleDateString("pt-BR")}</dd><dt>Forma</dt><dd>${esc(p.forma || "—")}</dd>
-      <dt>Horários</dt><dd>${(r.slots || []).map(fmtSlot).map(esc).join("<br>") || "—"}</dd></dl>
+      <dt>Horários</dt><dd>${M.isCompraBanco(r) ? `Banco de horas: ${M.dur(r.horas_compradas)} para ${esc(M.mesNome(r.mes_referencia))}` : (r.slots || []).map(fmtSlot).map(esc).join("<br>") || "—"}</dd></dl>
       <p class="rec-sign">Jundiaí, ${new Date(p.pago_em).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}.</p></div>`;
     $("#recibo").hidden = false;
   }
@@ -350,7 +481,8 @@
     const x = e.target.closest("[data-cancel]");
     if (x) {
       const card = x.closest(".myres"), box = x.parentElement;
-      box.innerHTML = `<span class="small">Cancelar esta reserva? Os horários ficam livres para outras pessoas.</span>
+      const rr = mine.find(m => m.id === card.dataset.id);
+      box.innerHTML = `<span class="small">${rr?.usa_banco_de ? "Cancelar este horário? As horas voltam para o seu banco de horas." : "Cancelar esta reserva? Os horários ficam livres para outras pessoas."}</span>
         <button type="button" class="btn danger small" data-cancel-yes>Cancelar reserva</button><button type="button" class="btn ghost small" data-cancel-no>Voltar</button>`;
       box.dataset.id = card.dataset.id;
       return;

@@ -1,7 +1,7 @@
 // E-mails para o cliente: pré-reserva recebida, reserva confirmada e lembrete na véspera.
 // Chamada pelo banco (gatilhos e agendamento via pg_net/pg_cron):
 //   { tipo: "pedido", id }     → logo depois da pré-reserva pelo site
-//   { tipo: "confirmada", id } → quando a clínica confirma
+//   { tipo: "confirmada", id } → quando a clínica confirma (e quando o cliente marca um horário pelo banco de horas)
 //   { tipo: "lembretes" }      → a cada hora; manda o lembrete de quem atende nas próximas 24h
 // Segura para ficar pública: cada e-mail sai uma vez só e apenas na janela de tempo certa.
 // Segredos: GMAIL_USER e GMAIL_APP_PASSWORD.
@@ -17,6 +17,9 @@ const money = (v: unknown) => Number(v || 0).toLocaleString("pt-BR", { style: "c
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const pad = (n: number) => String(n).padStart(2, "0");
 const hh = (h: unknown) => { const n = Number(h), H = Math.floor(n), m = Math.round((n - H) * 60); return m ? `${H}h${String(m).padStart(2, "0")}` : `${H}h`; };
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const mesNome = (iso: string) => { const [y, m] = String(iso).split("-").map(Number); return `${MESES[m - 1]} de ${y}`; };
+const dur = (h: unknown) => { const n = Number(h), H = Math.floor(n), m = Math.round((n - H) * 60); return H ? (m ? `${H}h${String(m).padStart(2, "0")}` : `${H}h`) : m ? `${m} min` : "0h"; };
 const first = (n: string) => String(n || "").trim().split(/\s+/)[0] || "";
 
 // ---------- Pix copia e cola (mesmo formato do site) ----------
@@ -41,9 +44,14 @@ function fmtSlot(s: any) {
 }
 function dueText(r: any) {
   if (r.plano !== "pacote") return "no dia do atendimento";
-  const firstDate = (r.reservation_slots || []).map((s: any) => s.data).sort()[0];
+  const firstDate = r.mes_referencia || (r.reservation_slots || []).map((s: any) => s.data).sort()[0];
   if (!firstDate) return "até o dia 05";
-  const [, m] = firstDate.split("-").map(Number);
+  const [y, m] = firstDate.split("-").map(Number);
+  // banco de horas comprado depois do dia 05: paga no dia da compra
+  if (r.horas_compradas != null && r.created_at) {
+    const c = new Date(new Date(r.created_at).getTime() - 3 * 3600e3);   // horário de Brasília
+    if (c.getUTCFullYear() === y && c.getUTCMonth() + 1 === m && c.getUTCDate() > 5) return `até ${pad(c.getUTCDate())}/${pad(m)}`;
+  }
   return `até 05/${pad(m)}`;
 }
 
@@ -62,7 +70,11 @@ ${o.extra || ""}
 </table><p style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#a69a93;margin:16px 0 0;">E-mail automático. Para falar com a clínica, use o WhatsApp.</p></td></tr></table></body></html>`;
 }
 const box = (html: string) => `<tr><td style="padding:18px 36px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f7f5;border:1px solid #e9e2dc;border-radius:12px;"><tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#38312e;">${html}</td></tr></table></td></tr>`;
-const detalhes = (r: any, slots: any[]) => box(`<b>${esc(r.rooms?.name || "Sala")}</b> · ${esc(PLANO[r.plano] || r.plano)}<br>${slots.map((s) => esc(fmtSlot(s))).join("<br>")}<br>Código da reserva: <b>${esc(r.codigo)}</b>`);
+const isCompra = (r: any) => r.plano === "pacote" && r.horas_compradas != null;
+const bancoLinha = (r: any) => `Banco de horas: ${dur(r.horas_compradas)} para usar em ${mesNome(r.mes_referencia)}`;
+const detalhes = (r: any, slots: any[]) => isCompra(r)
+  ? box(`<b>${esc(PLANO[r.plano])}</b> · banco de horas<br>${esc(bancoLinha(r))}<br>As horas valem em qualquer sala, só dentro desse mês.<br>Código: <b>${esc(r.codigo)}</b>`)
+  : box(`<b>${esc(r.rooms?.name || "Sala")}</b> · ${esc(r.usa_banco_de ? "Horas antecipadas · banco de horas" : PLANO[r.plano] || r.plano)}<br>${slots.map((s) => esc(fmtSlot(s))).join("<br>")}<br>Código da reserva: <b>${esc(r.codigo)}</b>`);
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "use POST" }, 405);
@@ -73,7 +85,7 @@ Deno.serve(async (req) => {
   const tr = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
   const send = (to: string, subject: string, html: string, text: string) =>
     tr.sendMail({ from: `"Clínica Morada do Ser" <${user}>`, to, subject, html, text, replyTo: "clinica.moradadoser@gmail.com" });
-  const SEL = "id,codigo,nome,email,plano,status,total,desconto_pct,forma_escolhida,link_pagamento,created_at,decided_at,aceite_em,email_pedido_em,email_confirmada_em,rooms(name),reservation_slots(data,hora_ini,hora_fim),payments(valor)";
+  const SEL = "id,codigo,nome,email,plano,status,total,desconto_pct,forma_escolhida,link_pagamento,created_at,decided_at,aceite_em,email_pedido_em,email_confirmada_em,horas_compradas,mes_referencia,usa_banco_de,user_id,rooms(name),reservation_slots(data,hora_ini,hora_fim),payments(valor)";
   const descLine = (r: any) => Number(r.desconto_pct || 0) > 0 ? `Desconto aplicado: ${Number(r.desconto_pct)}%<br>` : "";
   const descTxt = (r: any) => Number(r.desconto_pct || 0) > 0 ? `Desconto aplicado: ${Number(r.desconto_pct)}%\n` : "";
   const ord = (a: any, b: any) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini;
@@ -87,13 +99,15 @@ Deno.serve(async (req) => {
     if (!ok?.length) return json({ skipped: true });
     const slots = (r.reservation_slots || []).sort(ord);
     const pag = r.forma_escolhida === "link" ? "cartão de crédito (a clínica envia o link pelo WhatsApp)" : "Pix";
+    const compra = isCompra(r);
     try {
-      await send(r.email, `Recebemos sua pré-reserva · ${r.rooms?.name || "Morada do Ser"}`,
-        layout({ pre: "Seu horário está separado. A clínica confirma em até 2 horas.", titulo: "Recebemos sua pré-reserva",
-          corpo: `Olá, ${esc(first(r.nome))}! Seu horário já está separado. A clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento.`,
+      await send(r.email, compra ? `Recebemos sua compra de horas · ${mesNome(r.mes_referencia)}` : `Recebemos sua pré-reserva · ${r.rooms?.name || "Morada do Ser"}`,
+        layout({ pre: compra ? "A clínica confirma a compra em até 2 horas." : "Seu horário está separado. A clínica confirma em até 2 horas.", titulo: compra ? "Recebemos sua compra de horas" : "Recebemos sua pré-reserva",
+          corpo: compra ? `Olá, ${esc(first(r.nome))}! A clínica confirma a compra pelo WhatsApp em até 2 horas, no horário de funcionamento. Depois disso, as horas aparecem no seu Banco de horas, em Minha conta, onde você marca os horários.`
+            : `Olá, ${esc(first(r.nome))}! Seu horário já está separado. A clínica confirma pelo WhatsApp em até 2 horas, no horário de funcionamento.`,
           extra: detalhes(r, slots) + box(`${descLine(r)}Valor: <b>${money(r.total)}</b>, a pagar ${dueText(r)}<br>Forma de pagamento: ${pag}`),
           botao: ["Acompanhar a reserva", SITE + "conta.html"] }),
-        `Recebemos sua pré-reserva (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\n${descTxt(r)}Valor: ${money(r.total)}, a pagar ${dueText(r)} (${pag}).\nA clínica confirma pelo WhatsApp em até 2 horas.\nAcompanhe em ${SITE}conta.html`);
+        `Recebemos sua ${compra ? "compra de horas" : "pré-reserva"} (código ${r.codigo}).\n${compra ? bancoLinha(r) : `${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}`}\n${descTxt(r)}Valor: ${money(r.total)}, a pagar ${dueText(r)} (${pag}).\nA clínica confirma pelo WhatsApp em até 2 horas.\nAcompanhe em ${SITE}conta.html`);
     } catch (e) { await sb.from("reservations").update({ email_pedido_em: null }).eq("id", id); console.error("pedido", String(e)); return json({ error: "envio" }, 502); }
     return json({ ok: true });
   }
@@ -108,9 +122,15 @@ Deno.serve(async (req) => {
     const slots = (r.reservation_slots || []).sort(ord);
     const pago = (r.payments || []).reduce((s: number, p: any) => s + Number(p.valor || 0), 0);
     const falta = Math.max(0, Number(r.total || 0) - pago);
+    const compra = isCompra(r), uso = !!r.usa_banco_de;
     let pagHtml = "Pagamento recebido. Obrigada!";
     let pagTxt = pagHtml;
-    if (falta > 0) {
+    if (uso) {
+      const mes = slots[0] ? slots[0].data.slice(0, 8) + "01" : "";
+      const { data: b } = mes && r.user_id ? await sb.rpc("banco_horas_resumo", { p_user: r.user_id, p_mes: mes }) : { data: null };
+      pagHtml = `Estas horas saíram do seu banco de horas${b ? `. Saldo de ${esc(mesNome(mes))}: <b>${dur(b.saldo)}</b>` : ""}.<br><span style="font-size:12px;color:#8a7f79">Cancelando com mais de 24 horas de antecedência, em Minha conta, as horas voltam para o saldo.</span>`;
+      pagTxt = `Estas horas saíram do seu banco de horas${b ? `. Saldo de ${mesNome(mes)}: ${dur(b.saldo)}` : ""}.`;
+    } else if (falta > 0) {
       if (r.forma_escolhida === "link") {
         const link = /^https?:\/\//i.test(r.link_pagamento || "") ? r.link_pagamento : "";
         pagHtml = `Valor: <b>${money(falta)}</b>, a pagar ${dueText(r)}, com cartão de crédito.<br>${link ? `<a href="${esc(link)}" style="color:#a24f43;font-weight:bold">Pagar com cartão →</a>` : "A clínica vai enviar o link de pagamento pelo WhatsApp."}`;
@@ -125,11 +145,17 @@ Deno.serve(async (req) => {
       }
     }
     try {
-      await send(r.email, `Reserva confirmada · ${r.rooms?.name || "Morada do Ser"} · ${slots[0] ? fmtSlot(slots[0]) : ""}`,
-        layout({ pre: "Sua reserva na Clínica Morada do Ser está confirmada.", titulo: "Sua reserva está confirmada",
-          corpo: `Olá, ${esc(first(r.nome))}! Está tudo certo: a sala é sua no horário abaixo. Na véspera, mandamos um lembrete.`,
-          extra: detalhes(r, slots) + box(descLine(r) + pagHtml), botao: ["Ver minha reserva", SITE + "conta.html"] }),
-        `Sua reserva está confirmada (código ${r.codigo}).\n${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}\n${descTxt(r)}${pagTxt}\nEndereço: Rua Adolfo Torricelli, 284, Vianelo, Jundiaí`);
+      await send(r.email,
+        uso ? `Horário marcado pelo banco de horas · ${r.rooms?.name || "Morada do Ser"} · ${slots[0] ? fmtSlot(slots[0]) : ""}`
+          : compra ? `Compra de horas confirmada · ${mesNome(r.mes_referencia)}`
+          : `Reserva confirmada · ${r.rooms?.name || "Morada do Ser"} · ${slots[0] ? fmtSlot(slots[0]) : ""}`,
+        layout({ pre: uso ? "Seu horário está marcado e confirmado." : compra ? "Suas horas já estão no seu banco de horas." : "Sua reserva na Clínica Morada do Ser está confirmada.",
+          titulo: uso ? "Horário marcado pelo banco de horas" : compra ? "Sua compra de horas está confirmada" : "Sua reserva está confirmada",
+          corpo: uso ? `Olá, ${esc(first(r.nome))}! Seu horário está marcado e confirmado. Na véspera, mandamos um lembrete.`
+            : compra ? `Olá, ${esc(first(r.nome))}! As horas já estão no seu Banco de horas. Para marcar os horários, entre em Minha conta e toque em <b>Marcar horário</b>.`
+            : `Olá, ${esc(first(r.nome))}! Está tudo certo: a sala é sua no horário abaixo. Na véspera, mandamos um lembrete.`,
+          extra: detalhes(r, slots) + box(descLine(r) + pagHtml), botao: [compra ? "Marcar meus horários" : "Ver minha reserva", SITE + "conta.html"] }),
+        `${uso ? "Horário marcado pelo banco de horas" : compra ? "Sua compra de horas está confirmada" : "Sua reserva está confirmada"} (código ${r.codigo}).\n${compra ? bancoLinha(r) + "\nMarque os horários em " + SITE + "conta.html" : `${r.rooms?.name} · ${PLANO[r.plano]}\n${slots.map(fmtSlot).join("\n")}`}\n${descTxt(r)}${pagTxt}\nEndereço: Rua Adolfo Torricelli, 284, Vianelo, Jundiaí`);
     } catch (e) { await sb.from("reservations").update({ email_confirmada_em: null }).eq("id", id); console.error("confirmada", String(e)); return json({ error: "envio" }, 502); }
     return json({ ok: true });
   }

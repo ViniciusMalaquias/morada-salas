@@ -4,11 +4,11 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 
 - `index.html`: página pública (salas, planos e preços, localização).
 - `sala.html?id=...`: página de cada sala, com fotos e o fluxo de reserva (plano → horários livres → dados → pré-reserva).
-- `conta.html`: área do cliente (entrar, criar conta, minhas reservas, pagamento por Pix, cancelar, meus dados) e consulta de reserva de visitante por código + WhatsApp.
+- `conta.html`: área do cliente (entrar, criar conta, minhas reservas, banco de horas, pagamento por Pix, cancelar, meus dados) e consulta de reserva de visitante por código + WhatsApp.
 - `admin.html`: painel da equipe (link "Área da equipe" no rodapé), com menu lateral no computador e barra inferior no celular:
   - **Início**: aguardando confirmação, a receber, recebido no mês, atendimentos de hoje, ocupação da semana, mensalidades em aberto, o que precisa de atenção e gráfico de recebimentos.
   - **Agenda**: dia (todas as salas lado a lado) ou semana; clicar num horário vazio cria reserva ou bloqueio, clicar numa reserva abre os detalhes.
-  - **Clientes**: histórico, contato e total pago de cada cliente.
+  - **Clientes**: histórico, contato, total pago e banco de horas de cada cliente.
   - **Financeiro**: pagamentos do mês, mensalidades dos planos fixos (paga / em aberto / atrasada, com cobrança pelo WhatsApp) e planilha para baixar.
   - **Reservas**: enviar cobrança pelo WhatsApp, registrar pagamento (confirma a reserva), recusar, cancelar, bloquear horários da clínica e ver a agenda da semana por sala.
   - **Salas**: adicionar, ocultar, reordenar e excluir salas, enviar e reordenar fotos.
@@ -19,7 +19,7 @@ Site separado para a locação das salas da Clínica Morada do Ser, com painel p
 ## Como colocar no ar
 
 1. **Supabase**: crie um projeto em supabase.com (plano grátis atende).
-   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql`, `supabase/008_forma_pagamento.sql`, `supabase/009_emails_cliente.sql`, `supabase/010_meia_hora.sql` e `supabase/011_descontos.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
+   - Abra **SQL Editor**, cole todo o `supabase/schema.sql` e rode; depois faça o mesmo com `supabase/002_reservas.sql` `supabase/003_contas.sql`, `supabase/004_financeiro.sql`, `supabase/005_seguranca.sql`, `supabase/006_novos_planos.sql`, `supabase/007_aviso_reserva.sql`, `supabase/008_forma_pagamento.sql`, `supabase/009_emails_cliente.sql`, `supabase/010_meia_hora.sql`, `supabase/011_descontos.sql` e `supabase/012_banco_horas.sql`, nessa ordem. Isso cria as tabelas, as regras de segurança e o bucket público `fotos`.
    - Deixe **Allow new users to sign up** e **Confirm email** ligados (clientes criam conta pelo site).
    - Configure um **SMTP próprio** em **Authentication → Emails → SMTP Settings** (ex.: Resend ou o Gmail da clínica com senha de app). O e-mail padrão do Supabase só envia para membros do projeto, então sem isso clientes não recebem a confirmação de cadastro nem o "esqueci minha senha".
    - Equipe: a primeira pessoa entra na tabela `staff` pelo SQL Editor:
@@ -44,6 +44,10 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 
 - Horários de **30 em 30 minutos** (ex.: 14h30 às 15h ou às 16h30); meia hora custa metade da hora. No calendário, tocar no início e no último quadrinho marca o intervalo.
 - Planos: **hora avulsa** (R$ 38/h, paga no dia), **horas antecipadas** (R$ 28/h, mínimo de 4h no mesmo mês, acerto até o dia 05; horas não usadas não acumulam) e **período de 4h** (R$ 90; manhã 8–12, tarde 13–17, noite 17–21). Valores editáveis no painel.
+- **Banco de horas** (plano Horas antecipadas): além de escolher os horários na hora, a pessoa pode **comprar horas para usar depois**. Escolhe o mês (o atual ou o próximo) e a quantidade (mínimo do plano, de meia em meia hora); precisa ter conta (entrar ou criar no passo 3). Vira uma pré-reserva sem horários (`horas_compradas`, `mes_referencia`), com preço = horas × valor da hora antecipada e o desconto progressivo do plano (cada hora inteira conta como um horário). A clínica confirma no painel como qualquer pré-reserva; pagamento até o dia 05 (comprando depois do dia 05, no dia da compra).
+  - **Saldo do mês** = horas das compras **confirmadas** do mês + ajustes da clínica − horas já marcadas no mês (função `saldo_horas`). Vale só dentro do mês de referência, em qualquer sala; não acumula.
+  - **Usar**: em Minha conta, o card **Banco de horas** mostra saldo, horas compradas e usadas, e o botão **Marcar horário** (sala → dia do mês → horários livres de 30 em 30 min). O horário já nasce **confirmado** e com valor zero (`usa_banco_de` aponta para a compra); o banco (`usar_banco_horas`) valida conta, saldo, mês, horário de funcionamento e conflito. Cancelar com mais de 24h devolve as horas ao saldo. A compra confirmada só é cancelada pela clínica.
+  - **Painel**: na reserva de compra e no cliente aparecem o saldo do mês, os horários marcados e os ajustes; **Ajustar saldo** soma ou tira horas com motivo (tabela `ajustes_banco_horas`, só a equipe; o saldo não fica negativo). Na agenda, os horários do banco aparecem como confirmados com o selo "Banco de horas".
 - **Desconto progressivo** (opcional, por plano): um percentual sobre o total da reserva a partir de certa quantidade de horários (no período, de períodos) na mesma pré-reserva — ex.: "a partir de 3 horários, 5%; a partir de 6, 10%". Ativado e configurado em **Textos, preços e horários → Planos e preços**; por padrão vem ligado só para o período de 4h. O cálculo é feito no banco junto com o preço, e o valor aplicado fica salvo na reserva (visível no painel, no resumo do site e nos e-mails).
 - O site só mostra horários livres. A pré-reserva fica **aguardando confirmação** e já segura o horário até a clínica confirmar ou recusar no painel (com mensagem pronta para o WhatsApp).
 - Tudo é validado no banco (função `request_reservation`): horário de funcionamento, períodos, antecedência máxima de 3 meses, conflito de horário (com trava por sala, então duas pessoas não pegam o mesmo horário) e o **preço**, calculado com os valores do painel. O valor enviado pelo navegador é ignorado.
@@ -52,13 +56,13 @@ Sem o `config.js` preenchido o site abre em modo demonstração, com textos padr
 
 ## Aviso de nova pré-reserva
 
-- Cada pré-reserva feita pelo site dispara um e-mail para a clínica (Edge Function `supabase/functions/avisar-reserva`, chamada pelo banco).
+- Cada pré-reserva feita pelo site (inclusive compra de banco de horas) e cada horário marcado pelo banco de horas ("Horário marcado pelo banco de horas", já confirmado) dispara um e-mail para a clínica (Edge Function `supabase/functions/avisar-reserva`, chamada pelo banco).
 - Em **Edge Functions → Secrets** no Supabase, cadastre `GMAIL_USER` (o Gmail que envia) e `GMAIL_APP_PASSWORD` (senha de app desse Gmail).
 - O destino é o campo "E-mail que recebe o aviso" em **Textos, preços e horários → Contato** (ou o e-mail de contato, se vazio).
 
 ## E-mails para o cliente
 
-- Função `supabase/functions/email-cliente`: **pré-reserva recebida** (logo após reservar pelo site), **reserva confirmada** (com Pix copia e cola ou link do cartão) e **lembrete** na véspera (agendamento de hora em hora no banco, para quem foi confirmado com mais de 24h de antecedência).
+- Função `supabase/functions/email-cliente`: **pré-reserva recebida** (logo após reservar pelo site), **reserva confirmada** (com Pix copia e cola ou link do cartão; no banco de horas, a compra confirmada e cada horário marcado, com o saldo restante) e **lembrete** na véspera (agendamento de hora em hora no banco, para quem foi confirmado com mais de 24h de antecedência).
 - Usa os mesmos segredos do Gmail. Cada e-mail sai uma vez só.
 
 ## E-mails de cadastro e senha

@@ -131,3 +131,38 @@ input[readonly] { background: rgba(56, 49, 46, .05); color: rgba(56, 49, 46, .7)
 .ag-body small{color:var(--muted);font-size:.84rem}
 .ag-g{white-space:nowrap;font-size:.86rem}
 @media (max-width:520px){.ag-item{flex-wrap:wrap}.ag-g{width:100%;padding-left:58px}}
+
+/* ===== Banco de horas ===== */
+.banco-list{display:flex;flex-direction:column;gap:16px;margin-bottom:22px}
+.banco-list:empty{display:none}
+.bh-card{display:flex;flex-direction:column;gap:12px;border-left:4px solid #5f8a6a}
+.bh-card.pend{border-left-color:var(--rose)}
+.bh-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 18px;flex-wrap:wrap}
+.bh-head h2{font-family:var(--display);font-weight:500;font-size:2rem;margin:2px 0 0;line-height:1.1}
+.bh-head h2 small{font-family:var(--body);font-size:.9rem;color:var(--muted);font-weight:400;margin-left:6px}
+.bh-nums{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:.9rem}
+.bh-nums b{font-variant-numeric:tabular-nums}
+.bh-usos{margin:0;padding-left:1.1em;font-size:.9rem}
+.bh-tag{display:inline-block;font-size:.72rem;font-weight:600;padding:.2em .6em;border-radius:999px;background:#e3efe6;color:#3f6b4a;margin-left:6px;vertical-align:middle}
+@media (prefers-color-scheme: dark){.bh-tag{background:#22362a;color:#a8d3b4}}
+/* marcar horário (mesma grade de 30 em 30 min da página da sala) */
+.mc{max-width:560px}
+.mc .lbl{font-size:.85rem;font-weight:600}
+.mc .field select{font:inherit;padding:.7em .85em;border-radius:10px;border:1.5px solid #e9e2dc;background:#f9f7f5;color:#38312e;width:100%}
+.mc .daypick{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin}
+.mc .daypick button{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:64px;padding:8px 10px;border-radius:12px;border:1px solid #e9e2dc;background:#fff;color:#38312e;font:500 .8rem var(--body);cursor:pointer}
+.mc .daypick button small{font-size:.75rem;color:#8a7f79}
+.mc .daypick button span{font-size:.7rem;color:#a24f43;font-weight:600}
+.mc .daypick button.full span{color:#8a7f79;font-weight:500}
+.mc .daypick button[aria-selected="true"]{background:#ce8b7e;border-color:#ce8b7e;color:#fff}
+.mc .daypick button[aria-selected="true"] small,.mc .daypick button[aria-selected="true"] span{color:#fff}
+.mc .cal-scroll{max-height:46vh;overflow:auto}
+.mc table.cal{border-collapse:separate;border-spacing:4px;width:100%;table-layout:fixed;font-size:.85rem;font-variant-numeric:tabular-nums}
+.mc .cal th[scope=row]{text-align:right;padding-right:6px;white-space:nowrap;width:58px;font-weight:600;color:#38312e}
+.mc .cal tr.half th[scope=row]{font-weight:400;font-size:.75rem;color:#8a7f79}
+.mc .cal td{padding:0}
+.mc .cell{width:100%;height:36px;border-radius:6px;border:1px solid #e9e2dc;background:#fff;cursor:pointer;font:500 .82rem var(--body);color:#8a7f79;padding:0 12px;text-align:left}
+.mc .cell.free:hover{border-color:#ce8b7e;background:#f8ebe7}
+.mc .cell.sel{background:#ce8b7e;border-color:#ce8b7e;color:#fff;font-weight:600}
+.mc .cell.busy{background:#f3efeb;cursor:not-allowed}
+.mc .cell.past{background:transparent;border-style:dashed;opacity:.45;cursor:default}

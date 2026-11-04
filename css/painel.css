@@ -217,3 +217,14 @@ body.noscroll{overflow:hidden}
 .cg-cell.half{border-top-style:dashed}
 .cg-ev.short{padding:2px 8px;flex-direction:row;gap:6px;align-items:center;font-size:.76rem}
 .cg-ev.short small{white-space:nowrap}
+
+/* Banco de horas */
+.p-banco{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);border:1px dashed color-mix(in srgb,var(--ok) 55%,transparent)}
+.cg-ev .ev-selo{font-style:normal;font-size:.66rem;font-weight:600;align-self:flex-start;margin-top:2px;padding:0 .45em;border-radius:999px;background:var(--ok);color:#fff;white-space:nowrap}
+.cg-ev.short .ev-selo{display:none}
+.cg-ev.bh{border-style:dashed}
+.bh-box{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.bh-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.bh-saldo{font-weight:600;color:var(--ok);font-variant-numeric:tabular-nums}
+.bh-box .btn{align-self:flex-start}
+.bh-saldo.neg{color:var(--late)}

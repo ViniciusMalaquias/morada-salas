@@ -56,6 +56,39 @@
   startInput.value = M.iso(M.addDays(now, 1));
 
   const mode = () => !plan ? null : (plan === "avulso" || plan === "pacote") ? "hora" : plan === "periodo" ? "periodo" : "fixo";
+  // Horas antecipadas: "agora" (escolhe no calendário) ou "banco" (compra as horas e marca depois em Minha conta)
+  let pacMode = "agora";
+  const banco = () => plan === "pacote" && pacMode === "banco";
+  const mesIso = d => M.iso(new Date(d.getFullYear(), d.getMonth(), 1));
+  $("#bh-mes").innerHTML = [0, 1].map(i => { const v = mesIso(new Date(now.getFullYear(), now.getMonth() + i, 1));
+    return `<option value="${v}">${M.mesNome(v).replace(/^./, c => c.toUpperCase())}${i === 0 ? " (este mês)" : ""}</option>`; }).join("");
+  const bhMin = () => Number(C.antecipadas_min) || 4;
+  const bhHoras = () => { const v = Math.round(Number(String($("#bh-horas").value).replace(",", ".")) * 2) / 2; return isFinite(v) ? v : 0; };
+  $("#bh-horas").min = bhMin(); $("#bh-horas").value = bhMin();
+  $("#bh-menos").onclick = () => { $("#bh-horas").value = Math.max(bhMin(), bhHoras() - 0.5); summary(); };
+  $("#bh-mais").onclick = () => { $("#bh-horas").value = Math.min(300, Math.max(bhMin(), bhHoras() + 0.5)); summary(); };
+  $("#bh-horas").addEventListener("input", () => summary());
+  $("#bh-horas").addEventListener("change", () => { $("#bh-horas").value = Math.min(300, Math.max(bhMin(), bhHoras())); summary(); });
+  $("#bh-mes").addEventListener("change", () => summary());
+  document.querySelectorAll('input[name="pacmode"]').forEach(r => r.addEventListener("change", () => { pacMode = r.value; applyPacMode(); }));
+  function applyPacMode() {
+    const b = banco();
+    $("#pac-mode").hidden = plan !== "pacote";
+    $("#cal-area").hidden = b;
+    $("#banco-box").hidden = !b;
+    if (plan === "pacote") {
+      $("#time-title").textContent = b ? "Quantas horas você quer comprar" : "Escolha os horários";
+      $("#time-hint").textContent = b
+        ? `Mínimo de ${C.antecipadas_min} horas, de meia em meia hora. As horas valem para qualquer sala, só dentro do mês escolhido (não acumulam). Depois que a clínica confirmar, você marca os horários em Minha conta → Banco de horas. Acerto até o dia 05.`
+        : `Cada quadrinho é meia hora (toque no início e no fim para marcar o intervalo). Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.`;
+    }
+    // banco de horas precisa de conta: some o "Continuar como visitante"
+    const g = document.querySelector('#auth-pick [data-m="guest"]');
+    if (g) g.hidden = b;
+    if (b && authMode === "guest") setMode("login");
+    if (!b && authMode !== "user") $("#m-hint").textContent = HINT[authMode] || "";
+    hideErr(); summary();
+  }
   const isPast = (d, h) => { const s = M.iso(d); return s < todayIso || (s === todayIso && h <= nowH); };
 
   // ---------- escolher plano ----------
@@ -76,6 +109,7 @@
       plan === "periodo" ? `Toque nos períodos que quer reservar. Cada período de 4h sai ${M.money(C.preco_periodo_bloco)}.` :
       plan === "semanal" ? "Toque nas horas que vão se repetir toda semana. Quanto mais horas por semana, menor o valor da hora." :
       "Toque nas horas que vão se repetir a cada 15 dias.";
+    applyPacMode();
     refresh();
   }));
   startInput.addEventListener("change", () => { if (startInput.value < todayIso) startInput.value = todayIso;
@@ -211,13 +245,28 @@
   });
   let lastTap = null;
 
-  async function refresh() { hideErr(); await loadOcc(); drawCal(); summary(); }
+  async function refresh() { hideErr(); if (!banco()) await loadOcc(); drawCal(); summary(); }
 
   // ---------- resumo ----------
   function compute() {
     const m = mode(), slots = [], lines = [];
     if (!m) return null;
     let hours = 0, total = 0, priceLines = [];
+    if (banco()) {
+      const mes = $("#bh-mes").value;
+      hours = bhHoras(); total = hours * C.preco_antecipada;
+      lines.push(`Banco de horas: ${M.dur(hours)} para usar em ${M.mesNome(mes)}`);
+      priceLines.push(`${M.dur(hours)} × ${M.money(C.preco_antecipada)}/h`);
+      // no desconto progressivo, cada hora inteira conta como um horário
+      const q = Math.floor(hours), descPct = M.descontoPct(C, "pacote", q);
+      if (descPct > 0) { total = Math.round(total * (1 - descPct / 100) * 100) / 100; priceLines.push(`Desconto de ${descPct}% (${q} horas)`); }
+      const prox = M.descontoProx(C, "pacote", q);
+      if (prox) priceLines.push(`Com mais ${prox.falta}h, o desconto vira ${prox.pct}%.`);
+      if (hours < C.antecipadas_min) priceLines.push(`O mínimo é de ${C.antecipadas_min}h no mês.`);
+      else priceLines.push(`Acerto ${M.dueText({ plano: "pacote", mes_referencia: mes, horas_compradas: hours, created_at: new Date().toISOString() })}`);
+      const planObj = plans.find(p => p.id === plan);
+      return { slots, lines, priceLines, total, totalLabel: "Total", planName: planObj.nome, hours, banco: true, mes };
+    }
     if (m === "hora") {
       const byDate = {};
       sel.forEach(k => { const [d, h] = k.split("|"); (byDate[d] ||= []).push(+h); });
@@ -282,11 +331,12 @@
       <dl class="sum">
         <dt>Sala</dt><dd>${esc(room.name)}</dd>
         <dt>Plano</dt><dd>${esc(r.planName)}</dd>
-        <dt>Horários</dt><dd>${r.lines.length ? `<ul>${r.lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<span class="hint">${plan === "pacote" ? "Nenhum ainda (opcional)" : "Nenhum escolhido ainda"}</span>`}</dd>
+        <dt>${r.banco ? "Horas" : "Horários"}</dt><dd>${r.lines.length ? `<ul>${r.lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<span class="hint">Nenhum escolhido ainda</span>`}${r.banco ? `<span class="hint">Os horários você marca depois, em Minha conta.</span>` : ""}</dd>
       </dl>
       <div class="price">${r.priceLines.map(l => `<span>${esc(l)}</span>`).join("")}
         <p class="total"><span>${r.totalLabel}</span><strong>${M.money(r.total)}</strong></p></div>`;
-    $("#btn-send").disabled = !r.slots.length || (plan === "pacote" && r.hours < C.antecipadas_min);
+    $("#btn-send").disabled = (!r.banco && !r.slots.length) || (plan === "pacote" && r.hours < C.antecipadas_min);
+    $("#btn-send").textContent = r.banco ? "Enviar compra de horas" : "Enviar pré-reserva";
   }
 
   // ---------- dados, conta e envio ----------
@@ -301,10 +351,14 @@
     login: "Entre para ver todas as suas reservas num lugar só.",
     signup: "Crie a conta junto com a reserva: preencha os dados abaixo e escolha uma senha."
   };
+  const HINT_BANCO = {
+    login: "Para comprar horas e marcar depois, entre na sua conta: é nela que fica o seu banco de horas.",
+    signup: "Crie a conta: depois de confirmar o e-mail que enviamos, entre e conclua a compra das horas."
+  };
   function setMode(m) {
     authMode = m;
     document.querySelectorAll("#auth-pick .seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.m === m));
-    $("#m-hint").textContent = HINT[m] || "";
+    $("#m-hint").textContent = (banco() && HINT_BANCO[m]) || HINT[m] || "";
     $("#login-box").hidden = m !== "login";
     $("#f-res").hidden = m === "login";
     $("#pass-wrap").hidden = m !== "signup";
@@ -312,7 +366,7 @@
   document.querySelectorAll("#auth-pick .seg button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
 
   async function useUser(u) {
-    user = u; if (!u) { $("#who").hidden = true; $("#auth-pick").hidden = false; $("#f-email").disabled = false; setMode("guest"); return; }
+    user = u; if (!u) { $("#who").hidden = true; $("#auth-pick").hidden = false; $("#f-email").disabled = false; setMode(banco() ? "login" : "guest"); return; }
     const p = await M.getProfile();
     $("#who-name").textContent = p?.nome || u.email; $("#who-email").textContent = p?.nome ? `(${u.email})` : "";
     $("#who").hidden = false; $("#auth-pick").hidden = true;
@@ -336,9 +390,10 @@
   $("#btn-send").addEventListener("click", async () => {
     const r = compute(); if (!r) return;
     const nome = $("#f-nome").value.trim(), tel = $("#f-tel").value.trim(), email = $("#f-email").value.trim(), cpf = M.onlyDigits($("#f-cpf").value);
-    if (!r.slots.length) return showErr("Escolha pelo menos um horário.");
+    if (!r.banco && !r.slots.length) return showErr("Escolha pelo menos um horário.");
+    if (r.banco && authMode === "guest") { setMode("login"); return showErr("Para comprar horas e marcar depois, entre na sua conta ou crie uma no passo 3."); }
     if (plan === "pacote" && r.hours < C.antecipadas_min) return showErr(`As horas antecipadas são de no mínimo ${C.antecipadas_min} horas no mês.`);
-    if (authMode === "login") return showErr("Entre na sua conta ou escolha Continuar como visitante.");
+    if (authMode === "login") return showErr(r.banco ? "Entre na sua conta no passo 3 (ou crie uma) para comprar as horas." : "Entre na sua conta ou escolha Continuar como visitante.");
     if (!M.fullName(nome)) { $("#f-nome").focus(); return showErr("Preencha seu nome completo no passo 3."); }
     if (!M.emailValid(email)) { $("#f-email").focus(); return showErr("Preencha um e-mail válido no passo 3."); }
     if (!M.cpfValid(cpf)) { $("#f-cpf").focus(); return showErr("CPF inválido. Confira os números no passo 3."); }
@@ -348,7 +403,7 @@
     if (!sb) return showErr("O site está em modo demonstração e não recebe reservas.");
     hideErr();
     const btn = $("#btn-send"); btn.disabled = true; btn.textContent = "Enviando…";
-    const reset = () => { btn.disabled = false; btn.textContent = "Enviar pré-reserva"; };
+    const reset = () => { btn.disabled = false; btn.textContent = r.banco ? "Enviar compra de horas" : "Enviar pré-reserva"; };
 
     let pendingConfirm = false;
     if (authMode === "signup") {
@@ -357,6 +412,10 @@
         data: { nome, telefone: tel, cpf, profissao: $("#f-prof").value, registro: $("#f-reg").value.trim() } } });
       if (error) { reset(); return showErr(/registered|exists/i.test(error.message) ? "Já existe uma conta com esse e-mail. Use a opção Entrar." : `Não foi possível criar a conta: ${error.message}`); }
       if (data.session) user = data.user; else pendingConfirm = true;
+      if (r.banco && pendingConfirm) {
+        reset();
+        return showErr(`Conta criada! Confirme o e-mail que enviamos para ${email} e depois entre (opção Entrar) para concluir a compra das horas.`);
+      }
     }
 
     const resumo = [`Plano: ${r.planName}`, ...r.lines, `${r.totalLabel}: ${M.money(r.total)}`].join("\n");
@@ -364,6 +423,7 @@
       room_id: room.id, plano: plan, nome, telefone: tel, email, cpf,
       profissao: $("#f-prof").value, registro: $("#f-reg").value.trim(), obs: $("#f-obs").value.trim(),
       total: Math.round(r.total * 100) / 100, resumo, slots: r.slots, aceite: "true",
+      ...(r.banco ? { modo: "banco", mes: r.mes, horas: r.hours } : {}),
       forma: document.querySelector('input[name="forma"]:checked')?.value || "pix"
     }});
     reset();
@@ -374,12 +434,16 @@
     }
     const code = data.codigo;
     if (data.total != null) r.total = Number(data.total); // valor calculado pela clínica (banco)
-    const quando = M.dueText({ plano: plan, slots: r.slots });
+    const quando = M.dueText(r.banco ? { plano: plan, mes_referencia: r.mes, horas_compradas: r.hours, created_at: new Date().toISOString() } : { plano: plan, slots: r.slots });
+    $("#done-title").textContent = r.banco ? "Compra de horas enviada!" : "Pré-reserva enviada!";
+    $("#done-lead").textContent = r.banco
+      ? `${M.dur(r.hours)} para usar em ${M.mesNome(r.mes)}. Depois que a clínica confirmar, as horas aparecem no seu Banco de horas, em Minha conta, onde você marca os horários.`
+      : "Os horários ficam separados para você até a clínica confirmar.";
     $("#done-code").textContent = code;
     const forma = document.querySelector('input[name="forma"]:checked')?.value || "pix";
     const pixPl = forma === "pix" && C.pix_chave ? M.pixPayload({ chave: C.pix_chave, nome: C.pix_nome, cidade: C.pix_cidade, valor: Math.round(r.total * 100) / 100, txid: code }) : "";
     $("#done-pay").innerHTML = `
-      <p>Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp, em até 2 horas no horário de funcionamento. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
+      <p>${r.banco ? "A clínica confirma a compra pelo WhatsApp" : "Seu horário fica reservado enquanto a clínica confirma pelo WhatsApp"}, em até 2 horas no horário de funcionamento. Valor: <b>${M.money(r.total)}</b>, a pagar <b>${quando}</b>.</p>
       ${forma === "link"
         ? `<p><b>Pagamento com cartão de crédito:</b> a clínica vai entrar em contato pelo WhatsApp para enviar o link de pagamento.</p>`
         : pixPl ? `<div class="pix-done"><div class="qr" data-qr="${esc(pixPl)}" aria-label="QR Code Pix"></div><div class="stack" style="gap:8px;min-width:0;flex:1"><b>Pague com Pix</b><span class="small muted">Aponte a câmera do app do banco para o QR Code ou use o copia e cola:</span><div class="copyrow"><input type="text" readonly value="${esc(pixPl)}" aria-label="Pix copia e cola"><button type="button" class="copy" data-copy="${esc(pixPl)}">Copiar</button></div></div></div>
@@ -387,7 +451,7 @@
     $("#done-note").textContent = pendingConfirm
       ? `Sua conta foi criada. Confirme o e-mail que enviamos para ${email}; depois de entrar, esta reserva aparece em Minha conta.`
       : user ? "Você acompanha esta reserva em Minha conta." : "Guarde o código: com ele e seu WhatsApp você acompanha a reserva em Minha conta.";
-    $("#done-wa").href = wa(`Olá! Fiz uma pré-reserva pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nPagamento: ${forma === "link" ? "cartão de crédito (link de pagamento)" : "Pix"}\nNome: ${nome}`);
+    $("#done-wa").href = wa(`Olá! Fiz ${r.banco ? "uma compra de horas antecipadas (banco de horas)" : "uma pré-reserva"} pelo site.\nCódigo: ${code}\nSala: ${room.name}\n${resumo}\nPagamento: ${forma === "link" ? "cartão de crédito (link de pagamento)" : "Pix"}\nNome: ${nome}`);
     if (window.qrcode) document.querySelectorAll("[data-qr]").forEach(el => { const q = qrcode(0, "M"); q.addData(el.dataset.qr); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); });
     document.querySelectorAll("#done [data-copy]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copiado"; } catch { b.previousElementSibling.select(); } });
     document.querySelector(".booking").hidden = true;

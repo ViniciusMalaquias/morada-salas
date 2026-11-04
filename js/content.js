@@ -35,7 +35,7 @@
       "A desmarcação precisa ser feita com 24 horas de antecedência. Do contrário, a sala é cobrada.",
       "Em caso de atraso do paciente ou do profissional, o horário agendado precisa ser respeitado.",
       "Material lúdico e materiais para o atendimento são de responsabilidade do profissional.",
-      "Horas antecipadas: mínimo de 4 horas no mês, acertadas até o dia 05. Horas não usadas não passam para o mês seguinte, e horários extras são cobrados como hora avulsa."
+      "Horas antecipadas: mínimo de 4 horas no mês, acertadas até o dia 05. Dá para marcar os horários na hora ou comprar as horas e marcar depois (banco de horas, em Minha conta). Horas não usadas não passam para o mês seguinte, e horários extras são cobrados como hora avulsa."
     ],
     // Horário de funcionamento: [abre, fecha] por dia; null = fechado
     horarios: { "Seg": [8, 21], "Ter": [8, 21], "Qua": [8, 21], "Qui": [8, 21], "Sex": [8, 21], "Sáb": [8, 15], "Dom": null },
@@ -140,7 +140,7 @@
     const perHora = C.preco_periodo_bloco / 4;
     return [
       { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(C.preco_avulso / 2)}), sem compromisso. Pago no dia do atendimento.`, off: 0, desconto: descontoBadge(C, "avulso") },
-      { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês, todas no mesmo mês. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso), desconto: descontoBadge(C, "pacote") },
+      { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês: escolha os horários agora ou compre as horas e marque depois. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso), desconto: descontoBadge(C, "pacote") },
       { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso), desconto: descontoBadge(C, "periodo") }
     ];
   }
@@ -170,17 +170,36 @@
     return faixas.map((f, i) => i === 0 ? `Leve ${f.qtd}, ganhe ${f.pct}%` : `${f.qtd}+ ${f.pct}%`).join(" · ");
   }
 
+  // Vencimento das horas antecipadas: dia 05 do mês (ou o dia da compra, se o banco de horas for comprado depois do dia 05)
+  function vencimento(r) {
+    if (r.plano !== "pacote" || r.usa_banco_de) return null;
+    const ref = r.mes_referencia || (r.reservation_slots || r.slots || []).map(s => s.data).sort()[0];
+    if (!ref) return null;
+    const [y, m] = ref.split("-").map(Number);
+    let due = new Date(y, m - 1, 5, 23, 59);
+    if (r.horas_compradas && r.created_at) {
+      const c = new Date(r.created_at), fim = new Date(c.getFullYear(), c.getMonth(), c.getDate(), 23, 59);
+      if (fim > due) due = fim;
+    }
+    return due;
+  }
   // Quando pagar cada plano
   function dueText(r) {
     if (r.plano === "pacote") {
-      const first = (r.reservation_slots || r.slots || []).map(s => s.data).sort()[0];
-      if (!first) return "até o dia 05 do mês";
-      const [y, m] = first.split("-").map(Number);
-      const due = new Date(y, m - 1, 5, 23, 59);
-      return due < new Date() ? "o quanto antes (venceu dia 05)" : `até ${pad(5)}/${pad(m)}`;
+      if (r.usa_banco_de) return "já pago no banco de horas";
+      const due = vencimento(r);
+      if (!due) return "até o dia 05 do mês";
+      const dd = `${pad(due.getDate())}/${pad(due.getMonth() + 1)}`;
+      return due < new Date() ? `o quanto antes (venceu ${dd})` : `até ${dd}`;
     }
     return "no dia do atendimento";
   }
+  const MESES_N = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  // "2026-11-01" -> "novembro de 2026"
+  const mesNome = iso => { const [y, m] = String(iso).split("-").map(Number); return `${MESES_N[m - 1]} de ${y}`; };
+  // compra de banco de horas (sem horários) e horário marcado com o saldo
+  const isCompraBanco = r => r.plano === "pacote" && r.horas_compradas != null;
+  const isUsoBanco = r => !!r.usa_banco_de;
   const paidOf = r => (r.payments || []).reduce((s, p) => s + Number(p.valor || 0), 0);
   const dueOf = r => Math.max(0, Math.round((Number(r.total || 0) - paidOf(r)) * 100) / 100);
 
@@ -308,7 +327,7 @@
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
-    money, pct, plans, semanalRate, dueText, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
+    money, pct, plans, semanalRate, dueText, vencimento, mesNome, isCompraBanco, isUsoBanco, MESES: MESES_N, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
     descontoFaixas, descontoPct, descontoProx, descontoBadge,
     pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks
