@@ -98,7 +98,7 @@
     const f = box.querySelector(".bh-form");
     f.innerHTML = `<form class="dr-payform" novalidate>
       <div class="grid-f">
-        <div class="field"><label>Horas (+ ou −)</label><input name="h" type="number" step="0.5" placeholder="Ex.: 2 ou -1,5"></div>
+        <div class="field"><label>Horas (+ ou −)</label><input name="h" type="number" step="1" placeholder="Ex.: 2 ou -1"></div>
         <div class="field wide"><label>Motivo</label><input name="m" type="text" maxlength="300" placeholder="Ex.: cortesia, horário cancelado pela clínica"></div>
       </div>
       <p class="err" hidden></p>
@@ -108,6 +108,7 @@
     form.onsubmit = async ev => {
       ev.preventDefault();
       const h = Number(String(form.h.value).replace(",", ".").replace("−", "-"));
+      if (h && !Number.isInteger(h)) { e.textContent = "O banco de horas usa só horas inteiras (ex.: 2 ou -1)."; e.hidden = false; return; }
       const btn = form.querySelector("[type=submit]"); btn.disabled = true;
       const { error } = await sb.rpc("ajustar_banco_horas", { p_user: box.dataset.bhUser, p_mes: box.dataset.bhMes, p_horas: h || 0, p_motivo: form.m.value, p_compra: box.querySelector("[data-bh-ajustar]").dataset.compra || null });
       if (error) { btn.disabled = false; e.textContent = error.message; e.hidden = false; return; }
@@ -626,8 +627,13 @@
     const sync = () => {
       const hrs = Math.max(0, +f("fim").value - +f("ini").value), plano = f("plano").value;
       if (kind === "res" && !f("valor").dataset.touched) {
-        f("valor").value = (plano === "periodo" ? C.preco_periodo_bloco * Math.max(1, Math.round(hrs / 4)) : hrs * (plano === "pacote" ? C.preco_antecipada : C.preco_avulso)).toFixed(2);
+        f("valor").value = (plano === "periodo" ? C.preco_periodo_bloco * Math.max(1, Math.round(hrs / 4))
+          : plano === "pacote" ? hrs * C.preco_antecipada
+          : M.avulsoDetalhe(C, hrs > 0 ? [[+f("ini").value, +f("fim").value]] : []).total).toFixed(2);
       }
+      // meia hora só na hora avulsa
+      f("err").textContent = kind === "res" && plano !== "avulso" && hrs % 1 ? "Meia hora só existe na hora avulsa: neste plano, escolha um intervalo de horas inteiras." : "";
+      f("err").hidden = !f("err").textContent;
       f("forma-w").hidden = f("status").value !== "pago";
     };
     ["ini", "fim", "plano", "status", "freq"].forEach(k => f(k).addEventListener("change", sync));
@@ -635,7 +641,7 @@
     sync();
     $$("#dr-body .seg-a button").forEach(b => b.onclick = () => {
       kind = b.dataset.k; $$("#dr-body .seg-a button").forEach(x => x.setAttribute("aria-pressed", x === b));
-      f("res").hidden = kind !== "res"; f("blk").hidden = kind !== "blk"; f("save").textContent = kind === "res" ? "Salvar reserva" : "Salvar bloqueio";
+      f("res").hidden = kind !== "res"; f("blk").hidden = kind !== "blk"; f("save").textContent = kind === "res" ? "Salvar reserva" : "Salvar bloqueio"; sync();
     });
     $("#nf").onsubmit = async ev => {
       ev.preventDefault();
@@ -655,6 +661,7 @@
         if (!nome) { btn.disabled = false; return err("Preencha o nome do cliente."); }
         if (cpf && !M.cpfValid(cpf)) { btn.disabled = false; return err("CPF inválido."); }
         const plano = f("plano").value;
+        if (plano !== "avulso" && (slot.hora_fim - slot.hora_ini) % 1) { btn.disabled = false; return err("Meia hora só existe na hora avulsa: neste plano, escolha um intervalo de horas inteiras."); }
         const { error } = await sb.rpc("staff_create_reservation", { p: {
           room_id: room, plano, status: f("status").value === "pago" ? "confirmada" : f("status").value, pago: f("status").value === "pago" ? "true" : "false", forma_escolhida: f("fesc").value, nome, telefone: f("tel").value.trim(), email: f("email").value.trim(), cpf,
           total: f("valor").value, forma: f("forma").value, resumo: `Plano: ${PLANO[plano]}\n${fmtSlot(slot)}`, slots: [slot] } });

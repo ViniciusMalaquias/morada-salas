@@ -63,10 +63,10 @@
   $("#bh-mes").innerHTML = [0, 1].map(i => { const v = mesIso(new Date(now.getFullYear(), now.getMonth() + i, 1));
     return `<option value="${v}">${M.mesNome(v).replace(/^./, c => c.toUpperCase())}${i === 0 ? " (este mês)" : ""}</option>`; }).join("");
   const bhMin = () => Number(C.antecipadas_min) || 4;
-  const bhHoras = () => { const v = Math.round(Number(String($("#bh-horas").value).replace(",", ".")) * 2) / 2; return isFinite(v) ? v : 0; };
+  const bhHoras = () => { const v = Math.round(Number(String($("#bh-horas").value).replace(",", "."))); return isFinite(v) ? v : 0; };
   $("#bh-horas").min = bhMin(); $("#bh-horas").value = bhMin();
-  $("#bh-menos").onclick = () => { $("#bh-horas").value = Math.max(bhMin(), bhHoras() - 0.5); summary(); };
-  $("#bh-mais").onclick = () => { $("#bh-horas").value = Math.min(300, Math.max(bhMin(), bhHoras() + 0.5)); summary(); };
+  $("#bh-menos").onclick = () => { $("#bh-horas").value = Math.max(bhMin(), bhHoras() - 1); summary(); };
+  $("#bh-mais").onclick = () => { $("#bh-horas").value = Math.min(300, Math.max(bhMin(), bhHoras() + 1)); summary(); };
   $("#bh-horas").addEventListener("input", () => summary());
   $("#bh-horas").addEventListener("change", () => { $("#bh-horas").value = Math.min(300, Math.max(bhMin(), bhHoras())); summary(); });
   $("#bh-mes").addEventListener("change", () => summary());
@@ -79,8 +79,8 @@
     if (plan === "pacote") {
       $("#time-title").textContent = b ? "Quantas horas você quer comprar" : "Escolha os horários";
       $("#time-hint").textContent = b
-        ? `Mínimo de ${C.antecipadas_min} horas, de meia em meia hora. As horas valem para qualquer sala, só dentro do mês escolhido (não acumulam). Depois que a clínica confirmar, você marca os horários em Minha conta → Banco de horas. Acerto até o dia 05.`
-        : `Cada quadrinho é meia hora (toque no início e no fim para marcar o intervalo). Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.`;
+        ? `Mínimo de ${C.antecipadas_min} horas, só horas inteiras. As horas valem para qualquer sala, só dentro do mês escolhido (não acumulam). Depois que a clínica confirmar, você marca os horários em Minha conta → Banco de horas. Acerto até o dia 05.`
+        : pacHint();
     }
     // banco de horas precisa de conta: some o "Continuar como visitante"
     const g = document.querySelector('#auth-pick [data-m="guest"]');
@@ -89,6 +89,8 @@
     if (!b && authMode !== "user") $("#m-hint").textContent = HINT[authMode] || "";
     hideErr(); summary();
   }
+  // Horas antecipadas: só horas inteiras (cada toque marca 1 hora, que pode começar em :30)
+  const pacHint = () => `Cada toque marca 1 hora inteira, a partir do quadrinho tocado (ex.: 14h30–15h30); toque de novo para desmarcar. Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.`;
   const isPast = (d, h) => { const s = M.iso(d); return s < todayIso || (s === todayIso && h <= nowH); };
 
   // ---------- escolher plano ----------
@@ -104,8 +106,8 @@
     $("#weeknav").hidden = m === "fixo";
     $("#time-title").textContent = m === "fixo" ? "Escolha seus horários fixos" : m === "periodo" ? "Escolha os períodos" : "Escolha os horários";
     $("#time-hint").textContent =
-      plan === "avulso" ? "Cada quadrinho é meia hora. Toque em cada meia hora que quer usar (toque de novo para desmarcar). Para um intervalo longo, toque no início e no último quadrinho." :
-      plan === "pacote" ? `Cada quadrinho é meia hora (toque no início e no fim para marcar o intervalo). Marque pelo menos ${C.antecipadas_min} horas, todas dentro do mesmo mês. O acerto é feito até o dia 05.` :
+      plan === "avulso" ? "Cada quadrinho é meia hora (só a hora avulsa aceita meia hora). Toque em cada meia hora que quer usar (toque de novo para desmarcar). Para um intervalo longo, toque no início e no último quadrinho." :
+      plan === "pacote" ? pacHint() :
       plan === "periodo" ? `Toque nos períodos que quer reservar. Cada período de 4h sai ${M.money(C.preco_periodo_bloco)}.` :
       plan === "semanal" ? "Toque nas horas que vão se repetir toda semana. Quanto mais horas por semana, menor o valor da hora." :
       "Toque nas horas que vão se repetir a cada 15 dias.";
@@ -142,13 +144,17 @@
     return [0, 1, 2, 3, 4, 5, 6].map(n => M.addDays(week, n)).filter(d => openOf(d))
       .map(d => ({ key: M.iso(d), label: M.DOW_NAME[d.getDay()], sub: M.br(d), date: d }));
   }
+  // a meia hora está escolhida? (no pacote, sel guarda só o início de cada hora inteira)
+  const selHas = (col, h) => sel.has(`${col}|${h}`) || (plan === "pacote" && sel.has(`${col}|${h - 0.5}`));
+  // todas as meias horas escolhidas, como chaves "col|h"
+  const selHalves = () => plan === "pacote" ? [...sel].flatMap(k => { const [c, h] = k.split("|"); return [k, `${c}|${+h + 0.5}`]; }) : [...sel];
   function stateHour(c, h) {
     if (c.date) {
       const o = openOf(c.date);
       if (!o || h < o[0] || h >= o[1]) return "closed";
       if (isPast(c.date, h)) return "past";
       if (occ[c.key]?.has(h)) return "busy";
-      return sel.has(`${c.key}|${h}`) ? "sel" : "free";
+      return selHas(c.key, h) ? "sel" : "free";
     }
     const o = H[M.DOW_NAME[c.dow]];
     if (!o || h < o[0] || h >= o[1]) return "closed";
@@ -225,12 +231,9 @@
   $("#cal").addEventListener("click", e => {
     const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
     const k = b.dataset.k;
+    if (plan === "pacote") { tapHora(k); hideErr(); drawCal(); summary(); return; }
     if (sel.has(k)) { sel.delete(k); lastTap = null; }
     else {
-      if (plan === "pacote" && sel.size) {
-        const mes = k => k.split("|")[0].slice(0, 7), first = mes([...sel][0]);
-        if (mes(k) !== first) return showErr("As horas antecipadas precisam ser todas no mesmo mês. Desmarque as do outro mês para escolher estas.");
-      }
       sel.add(k);
       // tocar no início e depois no fim preenche o intervalo (só horários livres, mesmo dia)
       const [col, hs] = k.split("|"), h = +hs;
@@ -244,6 +247,22 @@
     hideErr(); drawCal(); summary();
   });
   let lastTap = null;
+  // Horas antecipadas: o toque marca a meia hora tocada + a seguinte (ou, se a seguinte não estiver livre, a anterior + a tocada);
+  // tocar numa hora escolhida tira a hora inteira
+  function tapHora(k) {
+    const [col, hs] = k.split("|"), h = +hs;
+    const ini = sel.has(k) ? h : sel.has(`${col}|${h - 0.5}`) ? h - 0.5 : null;
+    if (ini !== null) { sel.delete(`${col}|${ini}`); return; }
+    if (sel.size) {
+      const mes = x => x.split("|")[0].slice(0, 7);
+      if (mes(k) !== mes([...sel][0])) return showErr("As horas antecipadas precisam ser todas no mesmo mês. Desmarque as do outro mês para escolher estas.");
+    }
+    const c = columns().find(x => x.key === col); if (!c) return;
+    const livre = x => stateHour(c, x) === "free";
+    if (livre(h + 0.5)) sel.add(`${col}|${h}`);
+    else if (livre(h - 0.5)) sel.add(`${col}|${h - 0.5}`);
+    else showErr(`No plano Horas antecipadas os horários são de 1 hora inteira, e não há uma hora livre em ${M.hh(h)}. Escolha outro horário.`);
+  }
 
   async function refresh() { hideErr(); if (!banco()) await loadOcc(); drawCal(); summary(); }
 
@@ -269,12 +288,19 @@
     }
     if (m === "hora") {
       const byDate = {};
-      sel.forEach(k => { const [d, h] = k.split("|"); (byDate[d] ||= []).push(+h); });
+      selHalves().forEach(k => { const [d, h] = k.split("|"); (byDate[d] ||= []).push(+h); });
+      const faixas = [];
       Object.keys(byDate).sort().forEach(d => {
-        M.ranges(byDate[d]).forEach(([a, b]) => { slots.push({ freq: "unica", data: d, hora_ini: a, hora_fim: b }); lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${M.hh(a)}–${M.hh(b)}`); });
+        M.ranges(byDate[d]).forEach(([a, b]) => { faixas.push([a, b]); slots.push({ freq: "unica", data: d, hora_ini: a, hora_fim: b }); lines.push(`${M.DOW_NAME[M.parse(d).getDay()]} ${M.br(M.parse(d))}: ${M.hh(a)}–${M.hh(b)}`); });
       });
-      hours = sel.size / 2;
-      if (plan === "avulso") { total = hours * C.preco_avulso; priceLines.push(`${M.dur(hours)} × ${M.money(C.preco_avulso)}/h`, "Pago no dia do atendimento"); }
+      hours = selHalves().length / 2;
+      if (plan === "avulso") {
+        // por faixa contínua: horas cheias × hora + meia hora que sobrar × preço da meia hora
+        const a = M.avulsoDetalhe(C, faixas); total = a.total;
+        if (a.cheias) priceLines.push(`${a.cheias}h × ${M.money(C.preco_avulso)}/h`);
+        if (a.meias) priceLines.push(`${a.meias} × meia hora (${M.money(M.precoMeia(C))})`);
+        priceLines.push("Pago no dia do atendimento");
+      }
       else {
         total = hours * C.preco_antecipada; priceLines.push(`${M.dur(hours)} × ${M.money(C.preco_antecipada)}/h`);
         if (hours < C.antecipadas_min) priceLines.push(`Faltam ${M.dur(C.antecipadas_min - hours)} para o mínimo de ${C.antecipadas_min}h no mês.`);

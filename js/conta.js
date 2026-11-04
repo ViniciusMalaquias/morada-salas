@@ -257,7 +257,7 @@
         .sort((x, y) => x.s.data.localeCompare(y.s.data) || x.s.hora_ini - y.s.hora_ini);
       const [y, m] = b.mes.split("-").map(Number), ultimo = new Date(y, m, 0);
       const temConf = n(b.compradas) > 0 || n(b.ajustes) > 0, saldo = n(b.saldo);
-      const pode = temConf && saldo >= 0.5 && ultimo >= new Date(new Date().setHours(0, 0, 0, 0));
+      const pode = temConf && saldo >= 1 && ultimo >= new Date(new Date().setHours(0, 0, 0, 0));
       return `<article class="card bh-card${temConf ? "" : " pend"}">
         <div class="bh-head"><div><span class="eyebrow">Banco de horas · ${esc(M.mesNome(b.mes))}</span>
           <h2>${temConf ? durZ(saldo) : "Aguardando"}<small>${temConf ? "de saldo" : "confirmação da clínica"}</small></h2></div>
@@ -265,22 +265,25 @@
         ${temConf ? `<div class="bh-nums"><span>Compradas <b>${durZ(n(b.compradas))}</b></span><span>Usadas <b>${durZ(n(b.usadas))}</b></span>${n(b.ajustes) ? `<span>Ajustes da clínica <b>${n(b.ajustes) > 0 ? "+" : "−"}${M.dur(Math.abs(n(b.ajustes)))}</b></span>` : ""}</div>` : ""}
         ${n(b.pendentes) > 0 ? `<p class="muted small">Compra de ${M.dur(n(b.pendentes))} aguardando a confirmação da clínica${temConf ? " (entra no saldo quando for confirmada)" : ""}.</p>` : ""}
         ${usos.length ? `<ul class="bh-usos">${usos.map(({ r, s }) => `<li>${esc(fmtSlot(s))} · ${esc(r.sala || "")}</li>`).join("")}</ul>` : ""}
-        <p class="muted small">As horas valem até ${M.br(ultimo)}, em qualquer sala. Horas não usadas não passam para o mês seguinte.${temConf && saldo < 0.5 ? " Saldo do mês esgotado." : ""}</p>
+        <p class="muted small">As horas valem até ${M.br(ultimo)}, em qualquer sala. Horas não usadas não passam para o mês seguinte.${temConf && saldo < 1 ? (saldo > 0 ? ` Restam ${M.dur(saldo)}, menos que 1 hora: os horários do banco são de 1 hora inteira.` : " Saldo do mês esgotado.") : ""}</p>
       </article>`;
     }).join("");
   }
   $("#banco-box").addEventListener("click", e => { const b = e.target.closest("[data-marcar]"); if (b && !b.disabled) openMarcar(b.dataset.marcar); });
 
-  // Marcar horário com o saldo: sala → dia do mês → horários livres de 30 em 30 min (occupied_slots2, como na página da sala)
+  // Marcar horário com o saldo: sala → dia do mês → horários livres de 30 em 30 min (occupied_slots2, como na página da sala).
+  // Só horas inteiras: cada toque marca 1 hora (a meia hora tocada + a seguinte); mc.sel guarda o início de cada hora.
   const HOR = () => C.horarios || M.DEFAULTS.horarios;
   const openOf = d => HOR()[M.DOW_NAME[d.getDay()]] || null;
-  const mc = { mes: null, saldo: 0, room: null, day: null, sel: new Set(), occ: {}, lastTap: null, loading: false };
+  const mc = { mes: null, saldo: 0, room: null, day: null, sel: new Set(), occ: {}, loading: false };
+  const mcHas = h => mc.sel.has(h) || mc.sel.has(h - 0.5);
+  const mcHalves = () => [...mc.sel].flatMap(h => [h, h + 0.5]);
   const mcErr = msg => err("#mc-err", msg || "");
   async function openMarcar(mes) {
     const b = bancos.find(x => x.mes === mes); if (!b) return;
     if (!rooms) { try { rooms = await M.loadRooms(); } catch (e) { return toast("Não foi possível carregar as salas.", true); } }
     if (!rooms.length) return toast("Nenhuma sala disponível no momento.", true);
-    Object.assign(mc, { mes, saldo: Number(b.saldo || 0), room: mc.room && rooms.some(r => r.id === mc.room) ? mc.room : rooms[0].id, day: null, sel: new Set(), lastTap: null });
+    Object.assign(mc, { mes, saldo: Number(b.saldo || 0), room: mc.room && rooms.some(r => r.id === mc.room) ? mc.room : rooms[0].id, day: null, sel: new Set() });
     $("#mc-title").textContent = `Marcar horário · ${M.mesNome(mes)}`;
     $("#mc-saldo").textContent = `Saldo disponível: ${M.dur(mc.saldo)}. As horas marcadas saem do seu banco de horas.`;
     $("#mc-sala").innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === mc.room ? "selected" : ""}>${esc(r.name)}</option>`).join("");
@@ -297,7 +300,7 @@
     if (!o || h < o[0] || h >= o[1]) return "closed";
     if (key < M.iso(now) || (key === M.iso(now) && h <= now.getHours() + now.getMinutes() / 60)) return "past";
     if (mc.occ[key]?.has(h)) return "busy";
-    return mc.sel.has(h) ? "sel" : "free";
+    return mcHas(h) ? "sel" : "free";
   }
   function mcFree(d) { const o = openOf(d); let n = 0; if (o) for (let h = o[0]; h < o[1]; h += 0.5) if (mcState(d, h) === "free") n++; return n; }
   async function mcLoad() {
@@ -313,7 +316,7 @@
     const days = mcDays();
     $("#mc-dias").innerHTML = days.map(d => {
       const k = M.iso(d), f = mc.loading ? 0 : mcFree(d);
-      const info = mc.loading ? "…" : k === mc.day && mc.sel.size ? `✓ ${M.dur(mc.sel.size / 2)}` : f ? `${M.dur(f / 2)} livres` : "lotado";
+      const info = mc.loading ? "…" : k === mc.day && mc.sel.size ? `✓ ${M.dur(mc.sel.size)}` : f ? `${M.dur(f / 2)} livres` : "lotado";
       return `<button type="button" role="tab" data-day="${k}" aria-selected="${k === mc.day}" class="${f || mc.loading ? "" : "full"}"><b>${M.DOW_NAME[d.getDay()]}</b><small>${M.br(d)}</small><span>${info}</span></button>`;
     }).join("") || `<p class="muted small">Não há mais dias de funcionamento neste mês.</p>`;
     $("#mc-dias [aria-selected=true]")?.scrollIntoView({ block: "nearest", inline: "center" });
@@ -329,28 +332,27 @@
       }
       cal.innerHTML = html + "</tbody>";
     }
-    const hrs = mc.sel.size / 2;
-    $("#mc-sel").innerHTML = hrs ? `${M.ranges([...mc.sel]).map(([a, b]) => `${M.hh(a)}–${M.hh(b)}`).join(", ")} · <b>${M.dur(hrs)}</b> · saldo depois: ${durZ(mc.saldo - hrs)}` : "";
+    const hrs = mc.sel.size;
+    $("#mc-sel").innerHTML = hrs ? `${M.ranges(mcHalves()).map(([a, b]) => `${M.hh(a)}–${M.hh(b)}`).join(", ")} · <b>${M.dur(hrs)}</b> · saldo depois: ${durZ(mc.saldo - hrs)}` : "";
     $("#mc-ok").disabled = !hrs || hrs > mc.saldo;
   }
-  $("#mc-sala").addEventListener("change", e => { mc.room = e.target.value; mc.sel.clear(); mc.lastTap = null; mcErr(""); mcLoad(); });
-  $("#mc-dias").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (!b) return; mc.day = b.dataset.day; mc.sel.clear(); mc.lastTap = null; mcErr(""); mcDraw(); });
+  $("#mc-sala").addEventListener("change", e => { mc.room = e.target.value; mc.sel.clear(); mcErr(""); mcLoad(); });
+  $("#mc-dias").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (!b) return; mc.day = b.dataset.day; mc.sel.clear(); mcErr(""); mcDraw(); });
   $("#mc-cal").addEventListener("click", e => {
     const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
     const h = +b.dataset.h, d = M.parse(mc.day);
-    if (mc.sel.has(h)) { mc.sel.delete(h); mc.lastTap = null; mcErr(""); return mcDraw(); }
-    const add = [h];
-    // tocar no início e depois no fim preenche o intervalo (só horários livres)
-    if (mc.lastTap != null && h >= mc.lastTap + 1.5 && mc.sel.has(mc.lastTap)) {
-      const gap = []; for (let x = mc.lastTap + 0.5; x < h; x += 0.5) gap.push(x);
-      if (gap.every(x => mcState(d, x) === "free")) add.push(...gap);
-    }
-    if ((mc.sel.size + add.length) / 2 > mc.saldo) return mcErr(`Seu saldo é de ${M.dur(mc.saldo)}. Escolha menos horários.`);
-    add.forEach(x => mc.sel.add(x)); mc.lastTap = h; mcErr(""); mcDraw();
+    // tocar numa hora escolhida tira a hora inteira
+    const ini = mc.sel.has(h) ? h : mc.sel.has(h - 0.5) ? h - 0.5 : null;
+    if (ini !== null) { mc.sel.delete(ini); mcErr(""); return mcDraw(); }
+    // a meia hora tocada + a seguinte; se a seguinte não estiver livre, a anterior + a tocada
+    const start = mcState(d, h + 0.5) === "free" ? h : mcState(d, h - 0.5) === "free" ? h - 0.5 : null;
+    if (start === null) return mcErr(`Os horários do banco são de 1 hora inteira, e não há uma hora livre em ${M.hh(h)}. Escolha outro horário.`);
+    if (mc.sel.size + 1 > mc.saldo) return mcErr(`Seu saldo é de ${M.dur(mc.saldo)}. Escolha menos horários.`);
+    mc.sel.add(start); mcErr(""); mcDraw();
   });
   $("#mc-ok").addEventListener("click", async () => {
     const btn = $("#mc-ok"); btn.disabled = true; btn.textContent = "Marcando…";
-    const slots = M.ranges([...mc.sel]).map(([a, b]) => ({ data: mc.day, hora_ini: a, hora_fim: b }));
+    const slots = M.ranges(mcHalves()).map(([a, b]) => ({ data: mc.day, hora_ini: a, hora_fim: b }));
     const { data, error } = await sb.rpc("usar_banco_horas", { p_room: mc.room, p_slots: slots });
     btn.textContent = "Marcar horário";
     if (error) {

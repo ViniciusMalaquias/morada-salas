@@ -42,6 +42,7 @@
     periodos: [{ nome: "Manhã", ini: 8, fim: 12 }, { nome: "Tarde", ini: 13, fim: 17 }, { nome: "Noite", ini: 17, fim: 21 }],
     // Preços (R$)
     preco_avulso: 38,          // por hora, pago no dia do atendimento
+    preco_meia_hora: 19,       // meia hora avulsa (só no plano Hora avulsa); sem valor salvo, vale preco_avulso / 2
     preco_antecipada: 28,      // por hora, mínimo antecipadas_min horas no mesmo mês, acerto até o dia 05
     antecipadas_min: 4,
     preco_periodo_bloco: 90,   // por período (manhã, tarde ou noite)
@@ -82,6 +83,7 @@
     ]},
     { group: "Planos e preços", fields: [
       { key: "preco_avulso", label: "Hora avulsa (R$ por hora, paga no dia)", type: "money" },
+      { key: "preco_meia_hora", label: "Meia hora avulsa (R$ por 30 min, paga no dia)", type: "money", hint: "Só a hora avulsa aceita meia hora. Numa faixa contínua, cada hora cheia sai pelo valor da hora e a meia hora que sobrar, por este valor." },
       { key: "preco_antecipada", label: "Horas antecipadas (R$ por hora)", type: "money" },
       { key: "antecipadas_min", label: "Horas antecipadas: mínimo de horas no mês", type: "number", min: 1, max: 100 },
       { key: "preco_periodo_bloco", label: "Período de 4h (R$ por período)", type: "money" },
@@ -135,11 +137,24 @@
   const pct = (rate, base) => base > 0 ? Math.round((1 - rate / base) * 100) : 0;
   const semanalRate = (C, h) => C.preco_avulso; // planos fixos saíram; mantido por compatibilidade
 
+  // Meia hora avulsa: preco_meia_hora, ou metade da hora se não houver valor válido
+  function precoMeia(C) {
+    const v = C.preco_meia_hora;
+    return v !== null && v !== undefined && v !== "" && isFinite(Number(v)) ? Number(v) : Number(C.preco_avulso || 0) / 2;
+  }
+  // Valor da hora avulsa por faixa contínua: horas cheias × hora + (sobrou meia hora ? meia hora : 0)
+  // faixas: [[10, 11.5], [14, 14.5]] (use ranges() para juntar as meias horas)
+  function avulsoDetalhe(C, faixas) {
+    let cheias = 0, meias = 0;
+    faixas.forEach(([a, b]) => { const d = Number(b) - Number(a), h = Math.floor(d + 1e-9); cheias += h; if (d - h > 1e-9) meias++; });
+    return { cheias, meias, total: cheias * Number(C.preco_avulso || 0) + meias * precoMeia(C) };
+  }
+
   function plans(C) {
     const per = (C.periodos || []).map(p => `${p.nome} ${p.ini}h–${p.fim}h`).join(" · ");
     const perHora = C.preco_periodo_bloco / 4;
     return [
-      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(C.preco_avulso / 2)}), sem compromisso. Pago no dia do atendimento.`, off: 0, desconto: descontoBadge(C, "avulso") },
+      { id: "avulso", nome: "Hora avulsa", preco: `${money(C.preco_avulso)}/h`, desc: `De 30 em 30 minutos (meia hora sai ${money(precoMeia(C))}), sem compromisso. Pago no dia do atendimento.`, off: 0, desconto: descontoBadge(C, "avulso") },
       { id: "pacote", nome: "Horas antecipadas", preco: `${money(C.preco_antecipada)}/h`, desc: `Mínimo de ${C.antecipadas_min} horas no mês: escolha os horários agora ou compre as horas e marque depois. Acerto até o dia 05; horas não usadas não acumulam.`, off: pct(C.preco_antecipada, C.preco_avulso), desconto: descontoBadge(C, "pacote") },
       { id: "periodo", nome: "Período de 4h", preco: money(C.preco_periodo_bloco), desc: `Um turno inteiro (sai a ${money(perHora)}/h): ${per}. Pago no dia.`, off: pct(perHora, C.preco_avulso), desconto: descontoBadge(C, "periodo") }
     ];
@@ -229,6 +244,8 @@
     const { data, error } = await client.from("site_content").select("key,value");
     if (error) throw error;
     (data || []).forEach(r => { content[r.key] = r.value; });
+    // sem preço da meia hora salvo: metade da hora avulsa salva
+    if (!(data || []).some(r => r.key === "preco_meia_hora")) content.preco_meia_hora = Number(content.preco_avulso || 0) / 2;
     return content;
   }
 
@@ -327,7 +344,7 @@
   window.Morada = {
     DEFAULTS, FIELDS, ALL_DAYS, DOW_NAME, DOW_LONG, client, configured, cfg,
     photoUrl, loadContent, loadRooms, loadOccupied,
-    money, pct, plans, semanalRate, dueText, vencimento, mesNome, isCompraBanco, isUsoBanco, MESES: MESES_N, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
+    money, pct, plans, precoMeia, avulsoDetalhe, semanalRate, dueText, vencimento, mesNome, isCompraBanco, isUsoBanco, MESES: MESES_N, paidOf, dueOf, ranges, hh, dur, iso, parse, addDays, monday, br, pad,
     descontoFaixas, descontoPct, descontoProx, descontoBadge,
     pixPayload, cpfValid, cpfFormat, fullName, emailValid, onlyDigits,
     getUser, getProfile, statusOf, expiresAt, fmtDateTime, STATUS_CLIENTE, paintAccountLinks

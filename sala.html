@@ -23,8 +23,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611032125">
-<link rel="stylesheet" href="css/sala.css?v=202611032125">
+<link rel="stylesheet" href="css/style.css?v=202611032225">
+<link rel="stylesheet" href="css/sala.css?v=202611032225">
 </head>
 <body>
 <header class="top">
@@ -79,9 +79,9 @@
             <div class="banco-box" id="banco-box" hidden>
               <div class="field"><label for="bh-mes">Mês</label><select id="bh-mes"></select></div>
               <div class="field"><label for="bh-horas">Quantas horas</label>
-                <div class="stepper"><button type="button" class="icon" id="bh-menos" aria-label="Menos meia hora">−</button>
-                  <input id="bh-horas" type="number" inputmode="decimal" step="0.5">
-                  <button type="button" class="icon" id="bh-mais" aria-label="Mais meia hora">+</button></div></div>
+                <div class="stepper"><button type="button" class="icon" id="bh-menos" aria-label="Menos uma hora">−</button>
+                  <input id="bh-horas" type="number" inputmode="numeric" step="1">
+                  <button type="button" class="icon" id="bh-mais" aria-label="Mais uma hora">+</button></div></div>
             </div>
             <div class="rec-start" id="rec-start" hidden>
               <label for="f-inicio">Começar em</label>
@@ -175,9 +175,9 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611032125"></script>
+<script src="js/config.js?v=202611032225"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/content.js?v=202611032125"></script>
-<script src="js/sala.js?v=202611032125"></script>
+<script src="js/content.js?v=202611032225"></script>
+<script src="js/sala.js?v=202611032225"></script>
 </body>
 </html>

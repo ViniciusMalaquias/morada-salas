@@ -227,7 +227,7 @@
     const hint = fd.hint ? `<p class="hint">${fd.hint}</p>` : "";
     if (fd.type === "text") { w.innerHTML = label + `<input id="${id}" type="text">` + hint; w.querySelector("input").value = val ?? ""; }
     if (fd.type === "number") { w.innerHTML = label + `<input id="${id}" type="number" min="${fd.min}" max="${fd.max}" style="max-width:120px">`; w.querySelector("input").value = val ?? ""; }
-    if (fd.type === "money") { w.innerHTML = label + `<div class="money"><span>R$</span><input id="${id}" type="number" min="0" step="0.5" inputmode="decimal"></div>`; w.querySelector("input").value = val ?? ""; }
+    if (fd.type === "money") { w.innerHTML = label + `<div class="money"><span>R$</span><input id="${id}" type="number" min="0" step="0.5" inputmode="decimal"></div>` + hint; w.querySelector("input").value = val ?? ""; }
     if (fd.type === "hours") {
       const hs = Array.from({ length: 25 }, (_, h) => h);
       const opt = (sel) => hs.map(h => `<option value="${h}" ${h === sel ? "selected" : ""}>${h}h</option>`).join("");
@@ -332,7 +332,7 @@
     if (badDay) return toast(`${badDay[0]}: o horário de fechar precisa ser depois do de abrir.`, true);
     const per = get("periodos") || [];
     if (!per.length || per.some(p => !(p.fim > p.ini))) return toast("Confira os períodos: use o formato Nome início-fim, ex.: Tarde 14-18.", true);
-    for (const k of ["preco_avulso", "preco_antecipada", "antecipadas_min", "preco_periodo_bloco"])
+    for (const k of ["preco_avulso", "preco_meia_hora", "preco_antecipada", "antecipadas_min", "preco_periodo_bloco"])
       if (!(get(k) > 0)) return toast("Preencha todos os preços com valores maiores que zero.", true);
     if (per.some(p => p.fim - p.ini !== 4)) return toast("Cada período precisa ter 4 horas (ex.: Tarde 13-17), porque o preço é por período de 4h.", true);
     const descontos = get("descontos") || {};
