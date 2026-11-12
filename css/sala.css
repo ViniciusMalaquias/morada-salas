@@ -160,3 +160,27 @@ fieldset.forma legend{font-weight:600;font-size:.92rem;margin-bottom:8px;padding
 .stepper input{text-align:center;font-variant-numeric:tabular-nums}
 .stepper .icon{flex:none;width:42px;height:42px;font-size:1.2rem}
 @media (max-width:560px){.pac-mode,.banco-box{grid-template-columns:1fr}}
+
+/* Reservar horário: filtro de sala, passo "Escolha a sala" e chamada na página da sala */
+#reservar .sec-head h1{font-size:clamp(1.6rem,3.4vw,2.3rem)}
+.room-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.92rem;font-weight:600}
+.room-filter select{font:inherit;font-weight:500;padding:.45em .7em;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.cell.free{color:var(--muted);font-weight:500}
+.room-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.rpick{position:relative;cursor:pointer}
+.rpick input{position:absolute;opacity:0;inset:0;pointer-events:none}
+.rpick-body{display:flex;gap:12px;height:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);transition:border-color .12s}
+.rpick:hover .rpick-body{border-color:var(--rose)}
+.rpick input:checked + .rpick-body{border-color:var(--rose);background:var(--rose-soft);box-shadow:0 0 0 1px var(--rose)}
+.rpick input:focus-visible + .rpick-body{outline:3px solid var(--rose);outline-offset:2px}
+.rpick.rp-busy{cursor:default}
+.rpick.rp-busy .rpick-body{opacity:.6;border-style:dashed}
+.rpick-img{flex:none;width:84px;height:84px;border-radius:8px;overflow:hidden;background:var(--rose-soft)}
+.rpick-img img{width:100%;height:100%;object-fit:cover;display:block}
+.rpick-txt{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:.88rem}
+.rpick-txt b{font-size:1rem}
+.rpick-txt small{color:var(--muted);font-size:.8rem;line-height:1.4}
+.rpick-txt .ok-txt{color:var(--accent);font-weight:600}
+.rpick-txt a{color:var(--accent);margin-top:auto}
+.cta-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.cta-row .sec-head{margin-bottom:0}

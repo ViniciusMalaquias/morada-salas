@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sala · Morada do Ser</title>
-<meta name="description" content="Veja a sala, os horários livres e faça sua pré-reserva na Clínica Morada do Ser.">
+<meta name="description" content="Veja as fotos e os detalhes da sala e reserve seu horário na Clínica Morada do Ser.">
 <!-- compartilhamento -->
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
@@ -23,8 +23,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611032225">
-<link rel="stylesheet" href="css/sala.css?v=202611032225">
+<link rel="stylesheet" href="css/style.css?v=202611122206">
+<link rel="stylesheet" href="css/sala.css?v=202611122206">
 </head>
 <body>
 <header class="top">
@@ -36,6 +36,7 @@
     <nav>
       <a href="index.html#salas">Todas as salas</a>
       <a href="index.html#planos">Planos</a>
+      <a href="reservar.html">Reservar horário</a>
       <a data-account href="conta.html">Entrar</a>
       <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
     </nav>
@@ -52,117 +53,14 @@
     </div>
   </section>
 
-  <section class="band" id="reservar" hidden>
-    <div class="wrap">
+  <section class="band" id="room-cta" hidden>
+    <div class="wrap cta-row">
       <div class="sec-head">
-        <span class="eyebrow">Reservar esta sala</span>
-        <h2>Monte sua <em>reserva</em></h2>
-        <p>Escolha o plano e os horários. A pré-reserva segura o horário e a clínica confirma pelo WhatsApp.</p>
+        <span class="eyebrow">Reservar</span>
+        <h2>Gostou desta <em>sala</em>?</h2>
+        <p>Escolha o plano e os horários: mostramos os horários livres desta sala e, se ela estiver ocupada, as outras salas livres no mesmo horário.</p>
       </div>
-
-      <div class="booking">
-        <div class="steps-col">
-          <div class="step">
-            <h3><span class="n">1</span> Escolha o plano</h3>
-            <div class="plan-pick" id="plan-pick" role="radiogroup" aria-label="Plano"></div>
-          </div>
-
-          <div class="step" id="step-time" hidden>
-            <h3><span class="n">2</span> <span id="time-title">Escolha os horários</span></h3>
-            <div class="pac-mode" id="pac-mode" role="radiogroup" aria-label="Como usar as horas antecipadas" hidden>
-              <label class="pick"><input type="radio" name="pacmode" value="agora" checked>
-                <span class="pick-body"><b>Escolher os horários agora</b><small>Marque no calendário as horas do mês.</small></span></label>
-              <label class="pick"><input type="radio" name="pacmode" value="banco">
-                <span class="pick-body"><b>Comprar horas para usar depois</b><small>Escolha o mês e quantas horas. Você marca os horários quando quiser, em Minha conta (precisa ter conta).</small></span></label>
-            </div>
-            <p class="hint" id="time-hint"></p>
-            <div class="banco-box" id="banco-box" hidden>
-              <div class="field"><label for="bh-mes">Mês</label><select id="bh-mes"></select></div>
-              <div class="field"><label for="bh-horas">Quantas horas</label>
-                <div class="stepper"><button type="button" class="icon" id="bh-menos" aria-label="Menos uma hora">−</button>
-                  <input id="bh-horas" type="number" inputmode="numeric" step="1">
-                  <button type="button" class="icon" id="bh-mais" aria-label="Mais uma hora">+</button></div></div>
-            </div>
-            <div class="rec-start" id="rec-start" hidden>
-              <label for="f-inicio">Começar em</label>
-              <input type="date" id="f-inicio">
-            </div>
-            <div class="cal-area" id="cal-area">
-            <div class="weeknav" id="weeknav">
-              <button type="button" class="icon" id="wk-prev" aria-label="Semana anterior">←</button>
-              <strong id="wk-label"></strong>
-              <button type="button" class="icon" id="wk-next" aria-label="Próxima semana">→</button>
-            </div>
-            <div class="daypick" id="daypick" role="tablist" aria-label="Escolha o dia" hidden></div>
-            <div class="cal-scroll"><table class="cal" id="cal"></table></div>
-            <div class="legend"><span><i class="lg free"></i>Livre</span><span><i class="lg sel"></i>Escolhido</span><span><i class="lg busy"></i>Ocupado</span></div>
-            </div>
-          </div>
-
-          <div class="step" id="step-data" hidden>
-            <h3><span class="n">3</span> Seus dados</h3>
-            <div class="who" id="who" hidden>Reservando como <b id="who-name"></b> <span class="muted" id="who-email"></span> · <button type="button" class="linkbtn" id="who-out">Não é você? Sair</button></div>
-            <div id="auth-pick">
-              <div class="seg" role="tablist" aria-label="Como você quer reservar">
-                <button type="button" role="tab" data-m="guest" aria-selected="true">Continuar como visitante</button>
-                <button type="button" role="tab" data-m="login" aria-selected="false">Entrar</button>
-                <button type="button" role="tab" data-m="signup" aria-selected="false">Criar conta</button>
-              </div>
-              <p class="muted small" id="m-hint">Sem cadastro. Você acompanha a reserva pelo código e pelo WhatsApp.</p>
-              <div class="login-box" id="login-box" hidden>
-                <div class="field"><label for="a-email">E-mail</label><input id="a-email" type="email" autocomplete="username"></div>
-                <div class="field"><label for="a-pass">Senha</label><input id="a-pass" type="password" autocomplete="current-password"></div>
-                <button type="button" class="btn small" id="a-login">Entrar</button>
-                <p class="err" id="a-err" hidden></p>
-              </div>
-            </div>
-            <form id="f-res" class="form-grid" novalidate>
-              <div class="field"><label for="f-nome">Nome completo</label><input id="f-nome" type="text" autocomplete="name" required></div>
-              <div class="field"><label for="f-tel">Telefone de contato (WhatsApp)</label><input id="f-tel" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 90000-0000" required></div>
-              <div class="field"><label for="f-email">E-mail</label><input id="f-email" type="email" autocomplete="email" required></div>
-              <div class="field"><label for="f-cpf">CPF</label><input id="f-cpf" type="text" inputmode="numeric" data-cpf placeholder="000.000.000-00" required></div>
-              <div class="field" id="pass-wrap" hidden><label for="f-pass">Crie uma senha (mínimo 8 caracteres)</label><input id="f-pass" type="password" autocomplete="new-password" minlength="8"></div>
-              <div class="field"><label for="f-prof">Profissão</label><select id="f-prof"></select></div>
-              <div class="field"><label for="f-reg">Registro profissional (opcional)</label><input id="f-reg" type="text" placeholder="Ex.: CRP 06/123456"></div>
-              <div class="field wide"><label for="f-obs">Observação (opcional)</label><textarea id="f-obs" rows="2"></textarea></div>
-              <fieldset class="wide forma">
-                <legend>Como você vai pagar?</legend>
-                <div class="forma-pick">
-                  <label class="pick"><input type="radio" name="forma" value="pix" checked>
-                    <span class="pick-body"><b>Pix</b><small>Depois da pré-reserva aparece o QR Code e o copia e cola com o valor.</small></span></label>
-                  <label class="pick"><input type="radio" name="forma" value="link">
-                    <span class="pick-body"><b>Cartão de crédito (link de pagamento)</b><small>A clínica envia o link de pagamento pelo WhatsApp.</small></span></label>
-                </div>
-              </fieldset>
-              <div class="wide aceite">
-                <label class="check"><input type="checkbox" id="f-aceite"> <span>Li e aceito os <a href="termos.html#termos" target="_blank" rel="noopener">termos de uso</a> e a <a href="termos.html#privacidade" target="_blank" rel="noopener">política de privacidade</a>.</span></label>
-                <ul class="rules small" id="regras"></ul>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <aside class="summary-col">
-          <div class="card sumcard" id="sumcard">
-            <h3>Resumo</h3>
-            <div id="sum-body"><p class="hint">Escolha um plano para começar.</p></div>
-            <p class="err" id="sum-err" hidden></p>
-            <button class="btn" id="btn-send" type="button" disabled>Enviar pré-reserva</button>
-            <p class="hint small">Nada é cobrado agora. A clínica confirma a reserva e combina o pagamento com você.</p>
-          </div>
-        </aside>
-      </div>
-
-      <div class="card done" id="done" hidden>
-        <h3 id="done-title">Pré-reserva enviada!</h3>
-        <p>Código <strong id="done-code"></strong>. <span id="done-lead">Os horários ficam separados para você até a clínica confirmar.</span></p>
-        <div class="paybox" id="done-pay"></div>
-        <p class="muted small" id="done-note"></p>
-        <div class="row-actions">
-          <a class="btn" id="done-wa" href="#" target="_blank" rel="noopener">Falar com a clínica no WhatsApp</a>
-          <a class="btn ghost" id="done-acc" href="conta.html">Acompanhar minha reserva</a>
-        </div>
-      </div>
+      <a class="btn" data-reservar href="reservar.html">Reservar horário</a>
     </div>
   </section>
 </main>
@@ -175,9 +73,8 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611032225"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/content.js?v=202611032225"></script>
-<script src="js/sala.js?v=202611032225"></script>
+<script src="js/config.js?v=202611122206"></script>
+<script src="js/content.js?v=202611122206"></script>
+<script src="js/sala.js?v=202611122206"></script>
 </body>
 </html>

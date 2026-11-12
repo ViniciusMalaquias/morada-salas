@@ -42,7 +42,7 @@
     const card = el("article", { class: "room" });
     const urls = (r.photos || []).map(p => M.photoUrl(p.path)).filter(Boolean);
     const link = `sala.html?id=${encodeURIComponent(r.id)}`;
-    const main = el("a", { class: "room-main", href: link, "aria-label": `Ver horários livres da ${r.name}` });
+    const main = el("a", { class: "room-main", href: link, "aria-label": `Ver fotos e detalhes da ${r.name}` });
     main.innerHTML = urls[0]
       ? `<img src="${esc(urls[0])}" alt="${esc(r.name)}" loading="lazy">`
       : `<div class="ph"><div>Fotos em breve</div></div>`;
@@ -58,7 +58,7 @@
     }
     const body = el("div", { class: "room-body" });
     body.innerHTML = `<h3><a href="${link}">${esc(r.name)}</a></h3>${r.description ? `<p>${esc(r.description)}</p>` : ""}${(r.features || []).length ? `<ul>${r.features.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}`;
-    body.appendChild(el("a", { class: "btn btn-res", href: link }, `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Reservar e ver horários livres`));
+    body.appendChild(el("a", { class: "btn btn-res", href: `reservar.html?sala=${encodeURIComponent(r.id)}` }, `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Ver horários livres e reservar`));
     card.appendChild(body);
     roomsBox.appendChild(card);
   });

@@ -157,7 +157,7 @@
   function renderHero() {
     const occ = mine.filter(r => r.status === "confirmada").flatMap(r => (r.slots || []).map(s => ({ r, s, at: nextOcc(s) }))).filter(x => x.at).sort((a, b) => a.at - b.at)[0];
     const pend = mine.filter(r => M.statusOf(r, C) === "pendente").length;
-    if (!occ) { $("#hero-next").innerHTML = mine.length || pend ? "" : `<div class="hero-next empty"><div><span class="eyebrow">Comece por aqui</span><h2>Reserve sua primeira sala</h2><p class="muted">Escolha a sala, veja os horários livres e faça a pré-reserva em poucos minutos.</p></div><a class="btn" href="index.html#salas">Ver salas</a></div>`; return; }
+    if (!occ) { $("#hero-next").innerHTML = mine.length || pend ? "" : `<div class="hero-next empty"><div><span class="eyebrow">Comece por aqui</span><h2>Reserve sua primeira sala</h2><p class="muted">Escolha o horário, veja as salas livres e faça a pré-reserva em poucos minutos.</p></div><a class="btn" href="reservar.html">Reservar horário</a></div>`; return; }
     const { r, s, at } = occ;
     $("#hero-next").innerHTML = `<div class="hero-next">
       <div class="hn-date"><span>${M.DOW_NAME[at.getDay()]}</span><strong>${at.getDate()}</strong><span>${MESES[at.getMonth()].slice(0, 3)}</span></div>
@@ -197,7 +197,7 @@
       .filter(x => x.at > now).sort((a, b) => a.d - b.d || a.s.hora_ini - b.s.hora_ini);
     $("#ag-ics").hidden = !ev.length;
     if (!ev.length) {
-      $("#ag-list").innerHTML = `<div class="card empty"><p>Nenhum horário marcado nas próximas semanas.</p><a class="btn small" href="index.html#salas">Reservar uma sala</a></div>`;
+      $("#ag-list").innerHTML = `<div class="card empty"><p>Nenhum horário marcado nas próximas semanas.</p><a class="btn small" href="reservar.html">Reservar horário</a></div>`;
       return;
     }
     let html = "", lastKey = "";
@@ -271,8 +271,9 @@
   }
   $("#banco-box").addEventListener("click", e => { const b = e.target.closest("[data-marcar]"); if (b && !b.disabled) openMarcar(b.dataset.marcar); });
 
-  // Marcar horário com o saldo: sala → dia do mês → horários livres de 30 em 30 min (occupied_slots2, como na página da sala).
+  // Marcar horário com o saldo: dia do mês → horários (de todas as salas) → salas livres nesses horários, como em reservar.html.
   // Só horas inteiras: cada toque marca 1 hora (a meia hora tocada + a seguinte); mc.sel guarda o início de cada hora.
+  // mc.occ: { salaId: { "2026-11-10": Set([14, 14.5]) } }
   const HOR = () => C.horarios || M.DEFAULTS.horarios;
   const openOf = d => HOR()[M.DOW_NAME[d.getDay()]] || null;
   const mc = { mes: null, saldo: 0, room: null, day: null, sel: new Set(), occ: {}, loading: false };
@@ -283,10 +284,9 @@
     const b = bancos.find(x => x.mes === mes); if (!b) return;
     if (!rooms) { try { rooms = await M.loadRooms(); } catch (e) { return toast("Não foi possível carregar as salas.", true); } }
     if (!rooms.length) return toast("Nenhuma sala disponível no momento.", true);
-    Object.assign(mc, { mes, saldo: Number(b.saldo || 0), room: mc.room && rooms.some(r => r.id === mc.room) ? mc.room : rooms[0].id, day: null, sel: new Set() });
+    Object.assign(mc, { mes, saldo: Number(b.saldo || 0), room: null, day: null, sel: new Set() });
     $("#mc-title").textContent = `Marcar horário · ${M.mesNome(mes)}`;
     $("#mc-saldo").textContent = `Saldo disponível: ${M.dur(mc.saldo)}. As horas marcadas saem do seu banco de horas.`;
-    $("#mc-sala").innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === mc.room ? "selected" : ""}>${esc(r.name)}</option>`).join("");
     mcErr(""); $("#marcar").hidden = false;
     await mcLoad();
   }
@@ -299,14 +299,19 @@
     const o = openOf(d), key = M.iso(d), now = new Date();
     if (!o || h < o[0] || h >= o[1]) return "closed";
     if (key < M.iso(now) || (key === M.iso(now) && h <= now.getHours() + now.getMinutes() / 60)) return "past";
-    if (mc.occ[key]?.has(h)) return "busy";
-    return mcHas(h) ? "sel" : "free";
+    if (mcHas(h)) return "sel";
+    return mcFreeAt(key, h).length ? "free" : "busy";
   }
+  const mcBusy = (rid, key, h) => !!mc.occ[rid]?.[key]?.has(h);
+  const mcFreeAt = (key, ...hs) => rooms.filter(r => hs.every(h => !mcBusy(r.id, key, h)));
   function mcFree(d) { const o = openOf(d); let n = 0; if (o) for (let h = o[0]; h < o[1]; h += 0.5) if (mcState(d, h) === "free") n++; return n; }
   async function mcLoad() {
     const days = mcDays();
     mc.loading = true; mcDraw();
-    try { mc.occ = days.length ? await M.loadOccupied(mc.room, days[0], days[days.length - 1]) : {}; }
+    try {
+      const maps = days.length ? await Promise.all(rooms.map(r => M.loadOccupied(r.id, days[0], days[days.length - 1]))) : [];
+      mc.occ = {}; rooms.forEach((r, i) => mc.occ[r.id] = maps[i] || {});
+    }
     catch (e) { console.error(e); mcErr("Não foi possível carregar os horários. Tente de novo."); }
     mc.loading = false;
     if (!mc.day || !days.some(d => M.iso(d) === mc.day)) { const f = days.find(d => mcFree(d) > 0) || days[0]; mc.day = f ? M.iso(f) : null; }
@@ -327,16 +332,33 @@
       const d = M.parse(mc.day), o = openOf(d); let html = "<tbody>";
       for (let h = o[0]; h < o[1]; h += 0.5) {
         const st = mcState(d, h);
-        const txt = { free: "Livre", sel: "✓ Escolhido", busy: "Ocupado", past: "Já passou" }[st] || "";
+        const n = st === "free" && rooms.length > 1 ? mcFreeAt(mc.day, h).length : 0;
+        const txt = { free: n ? `${n} sala${n > 1 ? "s" : ""} livre${n > 1 ? "s" : ""}` : "Livre", sel: "✓ Escolhido", busy: "Ocupado", past: "Já passou" }[st] || "";
         html += `<tr class="${h % 1 ? "half" : "full"}"><th scope="row">${M.hh(h)}</th><td><button type="button" class="cell ${st}" data-h="${h}" ${st === "free" || st === "sel" ? "" : "disabled"} aria-pressed="${st === "sel"}" aria-label="${M.hh(h)} às ${M.hh(h + 0.5)}: ${txt}">${txt}</button></td></tr>`;
       }
       cal.innerHTML = html + "</tbody>";
     }
+    mcRooms();
     const hrs = mc.sel.size;
     $("#mc-sel").innerHTML = hrs ? `${M.ranges(mcHalves()).map(([a, b]) => `${M.hh(a)}–${M.hh(b)}`).join(", ")} · <b>${M.dur(hrs)}</b> · saldo depois: ${durZ(mc.saldo - hrs)}` : "";
-    $("#mc-ok").disabled = !hrs || hrs > mc.saldo;
+    $("#mc-ok").disabled = !hrs || hrs > mc.saldo || !mc.room;
   }
-  $("#mc-sala").addEventListener("change", e => { mc.room = e.target.value; mc.sel.clear(); mcErr(""); mcLoad(); });
+  // salas livres em todos os horários escolhidos (o banco marca tudo numa sala só)
+  function mcRooms() {
+    const box = $("#mc-sala-box"), halves = mcHalves();
+    if (mc.loading || !mc.day || !halves.length) { box.hidden = true; mc.room = null; return; }
+    const list = rooms.map(r => ({ r, busy: M.ranges(halves.filter(h => mcBusy(r.id, mc.day, h))) }));
+    const free = list.filter(x => !x.busy.length);
+    if (!free.some(x => x.r.id === mc.room)) mc.room = free.length === 1 ? free[0].r.id : null;
+    box.hidden = false;
+    $("#mc-sala-hint").textContent = !free.length
+      ? "Nenhuma sala está livre em todos os horários escolhidos. Troque algum horário (cada marcação é numa sala só)."
+      : free.length === 1 ? "Esta é a sala livre nesses horários." : `${free.length} salas estão livres nesses horários. Escolha uma.`;
+    $("#mc-salas").innerHTML = [...free, ...list.filter(x => x.busy.length)].map(({ r, busy }) => `
+      <label class="mc-sala${busy.length ? " rp-busy" : ""}"><input type="radio" name="mc-sala" value="${esc(r.id)}" ${busy.length ? "disabled" : ""} ${r.id === mc.room ? "checked" : ""}>
+        <span><b>${esc(r.name)}</b><small>${busy.length ? `Ocupada ${busy.map(([a, b]) => `${M.hh(a)}–${M.hh(b)}`).join(", ")}` : "Livre"}</small></span></label>`).join("");
+  }
+  $("#mc-salas").addEventListener("change", e => { if (e.target.name === "mc-sala") { mc.room = e.target.value; mcErr(""); mcDraw(); } });
   $("#mc-dias").addEventListener("click", e => { const b = e.target.closest("[data-day]"); if (!b) return; mc.day = b.dataset.day; mc.sel.clear(); mcErr(""); mcDraw(); });
   $("#mc-cal").addEventListener("click", e => {
     const b = e.target.closest("button.cell"); if (!b || b.disabled) return;
@@ -345,7 +367,9 @@
     const ini = mc.sel.has(h) ? h : mc.sel.has(h - 0.5) ? h - 0.5 : null;
     if (ini !== null) { mc.sel.delete(ini); mcErr(""); return mcDraw(); }
     // a meia hora tocada + a seguinte; se a seguinte não estiver livre, a anterior + a tocada
-    const start = mcState(d, h + 0.5) === "free" ? h : mcState(d, h - 0.5) === "free" ? h - 0.5 : null;
+    // (a hora inteira precisa estar livre numa mesma sala)
+    const ok = a => mcState(d, a) === "free" && mcState(d, a + 0.5) !== "busy" && mcFreeAt(mc.day, a, a + 0.5).length > 0;
+    const start = ok(h) && mcState(d, h + 0.5) === "free" ? h : mcState(d, h - 0.5) === "free" && ok(h - 0.5) ? h - 0.5 : null;
     if (start === null) return mcErr(`Os horários do banco são de 1 hora inteira, e não há uma hora livre em ${M.hh(h)}. Escolha outro horário.`);
     if (mc.sel.size + 1 > mc.saldo) return mcErr(`Seu saldo é de ${M.dur(mc.saldo)}. Escolha menos horários.`);
     mc.sel.add(start); mcErr(""); mcDraw();
@@ -353,6 +377,7 @@
   $("#mc-ok").addEventListener("click", async () => {
     const btn = $("#mc-ok"); btn.disabled = true; btn.textContent = "Marcando…";
     const slots = M.ranges(mcHalves()).map(([a, b]) => ({ data: mc.day, hora_ini: a, hora_fim: b }));
+    if (!mc.room) { btn.textContent = "Marcar horário"; return mcErr("Escolha a sala."); }
     const { data, error } = await sb.rpc("usar_banco_horas", { p_room: mc.room, p_slots: slots });
     btn.textContent = "Marcar horário";
     if (error) {
@@ -424,7 +449,7 @@
       : String(r.resumo || "").split("\n").filter(l => l && !/^Plano:|^Total|^Estimativa/.test(l));
     const canCancel = !guest && (st === "pendente" || (st === "confirmada" && !compra));
     const acts = guest ? "" : `
-      ${r.room_id ? `<a class="btn ghost small" href="sala.html?id=${encodeURIComponent(r.room_id)}">Reservar de novo</a>` : ""}
+      ${r.room_id ? `<a class="btn ghost small" href="reservar.html?sala=${encodeURIComponent(r.room_id)}">Reservar de novo</a>` : ""}
       ${r.status === "confirmada" ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Gostaria de remarcar um horário da reserva ${r.codigo} (${r.sala || ""}).`)}">Pedir remarcação</a>` : ""}
       ${canCancel ? `<button type="button" class="linkbtn danger-text" data-cancel>Cancelar reserva</button>` : ""}`;
     return `<article class="card myres st-${st}" data-id="${r.id || ""}">
@@ -440,7 +465,7 @@
 
   function renderList() {
     const box = $("#my-list");
-    if (!mine.length) { box.innerHTML = `<div class="card empty"><p>Você ainda não tem reservas.</p><a class="btn" href="index.html#salas">Ver salas e horários</a></div>`; return; }
+    if (!mine.length) { box.innerHTML = `<div class="card empty"><p>Você ainda não tem reservas.</p><a class="btn" href="reservar.html">Reservar horário</a></div>`; return; }
     const groups = [
       ["Ativas", mine.filter(r => ["pendente", "confirmada"].includes(M.statusOf(r, C)))],
       ["Histórico", mine.filter(r => ["recusada", "cancelada", "expirada"].includes(M.statusOf(r, C)))]

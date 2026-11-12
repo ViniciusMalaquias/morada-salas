@@ -24,8 +24,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611032225">
-<link rel="stylesheet" href="css/conta.css?v=202611032225">
+<link rel="stylesheet" href="css/style.css?v=202611122206">
+<link rel="stylesheet" href="css/conta.css?v=202611122206">
 </head>
 <body>
 <header class="top">
@@ -37,6 +37,7 @@
     <nav>
       <a href="index.html#salas">Salas</a>
       <a href="index.html#planos">Planos</a>
+      <a href="reservar.html">Reservar horário</a>
       <a class="btn" data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
     </nav>
   </div>
@@ -109,7 +110,7 @@
         <h1 id="hello">Olá!</h1>
       </div>
       <div class="acc-actions">
-        <a class="btn" href="index.html#salas">Nova reserva</a>
+        <a class="btn" href="reservar.html">Nova reserva</a>
         <a class="btn ghost" href="admin.html" id="to-admin" hidden>Painel da equipe</a>
         <button class="btn ghost" type="button" id="logout">Sair</button>
       </div>
@@ -181,11 +182,13 @@
       <h2 class="h3" id="mc-title">Marcar horário</h2>
       <p class="muted small" id="mc-saldo"></p>
     </div>
-    <div class="field"><label for="mc-sala">Sala</label><select id="mc-sala"></select></div>
     <div class="field"><span class="lbl">Dia</span><div class="daypick" id="mc-dias" role="tablist" aria-label="Escolha o dia"></div></div>
     <div class="field"><span class="lbl">Horários livres</span>
       <p class="muted small">Os horários do banco são de 1 hora inteira: cada toque marca 1 hora a partir do quadrinho tocado (ex.: 14h30–15h30). Toque de novo para desmarcar.</p>
       <div class="cal-scroll"><table class="cal one" id="mc-cal"></table></div></div>
+    <div class="field" id="mc-sala-box" hidden><span class="lbl">Sala</span>
+      <p class="muted small" id="mc-sala-hint"></p>
+      <div class="mc-salas" id="mc-salas" role="radiogroup" aria-label="Sala"></div></div>
     <p class="small" id="mc-sel"></p>
     <p class="err" id="mc-err" hidden></p>
     <div class="row-actions"><button type="button" class="btn" id="mc-ok" disabled>Marcar horário</button><button type="button" class="btn ghost" data-close-mc>Fechar</button></div>
@@ -202,9 +205,9 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611032225"></script>
+<script src="js/config.js?v=202611122206"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="js/content.js?v=202611032225"></script>
-<script src="js/conta.js?v=202611032225"></script>
+<script src="js/content.js?v=202611122206"></script>
+<script src="js/conta.js?v=202611122206"></script>
 </body>
 </html>

@@ -166,3 +166,16 @@ input[readonly] { background: rgba(56, 49, 46, .05); color: rgba(56, 49, 46, .7)
 .mc .cell.sel{background:#ce8b7e;border-color:#ce8b7e;color:#fff;font-weight:600}
 .mc .cell.busy{background:#f3efeb;cursor:not-allowed}
 .mc .cell.past{background:transparent;border-style:dashed;opacity:.45;cursor:default}
+
+/* Marcar horário: escolha da sala depois dos horários */
+.mc-salas{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.mc-sala{position:relative;cursor:pointer}
+.mc-sala input{position:absolute;opacity:0;inset:0;pointer-events:none}
+.mc-sala span{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1.5px solid #e9e2dc;border-radius:10px;background:#fff;color:#38312e;font-size:.9rem;height:100%}
+.mc-sala small{font-size:.78rem;color:#a24f43;font-weight:600}
+.mc-sala:hover span{border-color:#ce8b7e}
+.mc-sala input:checked + span{border-color:#ce8b7e;background:#f8ebe7;box-shadow:0 0 0 1px #ce8b7e}
+.mc-sala input:focus-visible + span{outline:3px solid #ce8b7e;outline-offset:2px}
+.mc-sala.rp-busy{cursor:default}
+.mc-sala.rp-busy span{opacity:.6;border-style:dashed}
+.mc-sala.rp-busy small{color:#8a7f79;font-weight:500}

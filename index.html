@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611032225">
+<link rel="stylesheet" href="css/style.css?v=202611122206">
 </head>
 <body>
 <div class="notice" id="demo-notice" hidden>Modo demonstração: conecte o Supabase em <code>js/config.js</code> para carregar as salas reais.</div>
@@ -41,7 +41,7 @@
       <a href="#local">Localização</a>
       <a data-account href="conta.html">Entrar</a>
       <a data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>
-      <a class="btn" href="#salas">Reservar</a>
+      <a class="btn" href="reservar.html">Reservar horário</a>
     </nav>
   </div>
 </header>
@@ -54,7 +54,7 @@
         <h1 data-c="hero_titulo" data-rich></h1>
         <p class="lead" data-c="hero_texto"></p>
         <div class="hero-actions">
-          <a class="btn" href="#salas">Reservar uma sala</a>
+          <a class="btn" href="reservar.html">Reservar horário</a>
           <a class="btn ghost" href="#planos">Planos e preços</a>
         </div>
         <div class="facts" id="facts"></div>
@@ -113,11 +113,11 @@
       <div class="sec-head">
         <span class="eyebrow">Planos e preços</span>
         <h2>Quanto mais você usa, menos paga por <em>hora</em></h2>
-        <p>Os planos valem para qualquer sala. Escolha a sala para ver os horários livres e fazer sua pré-reserva.</p>
+        <p>Os planos valem para qualquer sala. Escolha o horário que você precisa e veja as salas livres nele.</p>
       </div>
       <div class="plans" id="plans"></div>
       <ul class="rules" id="regras"></ul>
-      <a class="btn" href="#salas">Escolher uma sala</a>
+      <a class="btn" href="reservar.html">Reservar horário</a>
     </div>
   </section>
 
@@ -150,8 +150,8 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=202611032225"></script>
-<script src="js/content.js?v=202611032225"></script>
-<script src="js/site.js?v=202611032225"></script>
+<script src="js/config.js?v=202611122206"></script>
+<script src="js/content.js?v=202611122206"></script>
+<script src="js/site.js?v=202611122206"></script>
 </body>
 </html>
