@@ -518,11 +518,89 @@
     const y = e.target.closest("[data-cancel-yes]");
     if (y) {
       y.disabled = true;
-      const { error } = await sb.rpc("cancel_my_reservation", { p_id: y.parentElement.dataset.id });
+      const id = y.parentElement.dataset.id, rr = mine.find(m => m.id === id);
+      let { data, error } = await sb.rpc("cancel_my_reservation", { p_id: id });
       if (error) { toast(error.message, true); y.disabled = false; return; }
-      toast("Reserva cancelada."); loadMine();
+      // a função devolve a linha atualizada; se não devolver (banco sem a migration 014), relê a reserva
+      if (!data) ({ data } = await sb.from("reservations").select("id,status").eq("id", id).maybeSingle());
+      // só segue se o banco confirmou o cancelamento
+      if (!data || data.id !== id || data.status !== "cancelada") {
+        toast("Não conseguimos confirmar o cancelamento. Atualize a página e confira; se continuar, fale com a clínica pelo WhatsApp.", true);
+        loadMine(); return;
+      }
+      await loadMine();
+      if (rr) openRemarcar(rr); else toast("Reserva cancelada.");
     }
   });
+
+  // ---------- depois de cancelar: convite para remarcar ----------
+  const SUG_DIAS = 14, SUG_MAX = 4;
+  // próximos horários livres da mesma sala, com a mesma duração (no período, um período inteiro);
+  // um por dia, o mais perto do horário cancelado, para manter a rotina da pessoa
+  async function sugestoes(r) {
+    if (!r.room_id || !r.slots?.length || !["avulso", "pacote", "periodo"].includes(r.plano)) return [];
+    const s0 = r.slots.slice().sort((a, b) => a.data.localeCompare(b.data) || a.hora_ini - b.hora_ini)[0];
+    const ini0 = Number(s0.hora_ini), dur = r.plano === "pacote" ? 1 : Number(s0.hora_fim) - ini0;
+    if (!(dur > 0)) return [];
+    const P = C.periodos?.length ? C.periodos : M.DEFAULTS.periodos;
+    const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const occ = await M.loadOccupied(r.room_id, today, M.addDays(today, SUG_DIAS - 1));
+    const cancelados = new Set(r.slots.map(s => `${s.data}|${Number(s.hora_ini)}`));
+    const out = [];
+    for (let i = 0; i < SUG_DIAS && out.length < SUG_MAX; i++) {
+      const d = M.addDays(today, i), key = M.iso(d), o = openOf(d); if (!o) continue;
+      const busy = occ[key] || new Set();
+      const livre = (a, b) => { for (let h = a; h < b; h += 0.5) if (busy.has(h)) return false; return true; };
+      const ok = (a, b) => a >= o[0] && b <= o[1] && atH(d.getFullYear(), d.getMonth(), d.getDate(), a) > now && !cancelados.has(`${key}|${a}`) && livre(a, b);
+      const cands = r.plano === "periodo"
+        ? P.map((p, pi) => ({ a: p.ini, b: p.fim, extra: `&periodo=${pi}`, nome: p.nome })).filter(c => ok(c.a, c.b))
+        : Array.from({ length: Math.max(0, Math.round((o[1] - dur - o[0]) * 2) + 1) }, (_, k) => o[0] + k / 2)
+            .filter(a => ok(a, a + dur)).map(a => ({ a, b: a + dur, extra: `&ini=${a}&fim=${a + dur}` }));
+      if (!cands.length) continue;
+      const c = cands.sort((x, y) => Math.abs(x.a - ini0) - Math.abs(y.a - ini0) || x.a - y.a)[0];
+      out.push({
+        dia: i === 0 ? "Hoje" : i === 1 ? "Amanhã" : `${M.DOW_NAME[d.getDay()]} ${M.br(d)}`,
+        hora: `${c.nome ? c.nome + " · " : ""}${M.hh(c.a)}–${M.hh(c.b)}`,
+        url: `reservar.html?sala=${encodeURIComponent(r.room_id)}&plano=${r.plano}&data=${key}${c.extra}`
+      });
+    }
+    return out;
+  }
+
+  async function openRemarcar(r) {
+    const box = $("#rm-body"), sala = r.sala || "sala", banco = !!r.usa_banco_de, pago = banco ? 0 : M.paidOf(r);
+    const agenda = r.room_id ? `reservar.html?sala=${encodeURIComponent(r.room_id)}` : "reservar.html";
+    const head = `<div class="rm-head"><span class="rm-ok" aria-hidden="true">✓</span>
+      <div><h2 class="h3" id="rm-title">Sessão cancelada</h2><p class="muted small">${esc(sala)} · código ${esc(r.codigo)}</p></div></div>`;
+    // valor já pago: o site não tem regra de reembolso, então a pessoa combina com a clínica antes de remarcar
+    const pagoHtml = pago > 0 ? `<div class="rm-pago"><b>E o valor que você já pagou (${M.money(pago)})?</b>
+      <p class="small">O cancelamento pelo site não devolve o valor automaticamente. Fale com a clínica pelo WhatsApp para combinar se ele vira crédito para um novo horário ou se é devolvido.</p>
+      <a class="btn ghost small" target="_blank" rel="noopener" href="${wa(`Olá! Cancelei a reserva ${r.codigo} (${sala}) pelo site e já tinha pago ${M.money(pago)}. Como fica esse valor?`)}">Combinar pelo WhatsApp</a></div>` : "";
+    const later = `<button type="button" class="linkbtn rm-later" data-close-rm>Agora não</button>`;
+    $("#remarcar").hidden = false;
+
+    if (banco) {
+      const mes = (r.slots?.[0]?.data || "").slice(0, 8) + "01";
+      box.innerHTML = `${head}<p>As horas voltaram para o seu banco de horas. Que tal já marcar outro horário com elas?</p>
+        <div class="rm-actions"><button type="button" class="btn" data-rm-banco="${esc(mes)}">Marcar outro horário</button>${later}</div>`;
+      return;
+    }
+    box.innerHTML = `${head}${pagoHtml}<p class="muted small">Procurando horários livres…</p>`;
+    let sug = [];
+    try { sug = await sugestoes(r); } catch (e) { console.error(e); }
+    if ($("#remarcar").hidden) return;
+    box.innerHTML = `${head}${pagoHtml}
+      ${sug.length ? `<p>Que tal remarcar? Estes são os próximos horários livres da <b>${esc(sala)}</b>:</p>
+        <div class="rm-slots">${sug.map(s => `<a class="rm-slot" href="${s.url}"><b>${esc(s.dia)}</b><span>${esc(s.hora)}</span></a>`).join("")}</div>`
+        : `<p>Quando quiser remarcar, é só escolher um novo horário na agenda da <b>${esc(sala)}</b>.</p>`}
+      <div class="rm-actions"><a class="btn" href="${agenda}">Ver mais horários</a>${later}</div>`;
+  }
+  $("#remarcar").addEventListener("click", async e => {
+    if (e.target.closest("[data-close-rm]")) { $("#remarcar").hidden = true; return; }
+    const b = e.target.closest("[data-rm-banco]");
+    if (b) { b.disabled = true; $("#remarcar").hidden = true; await loadBanco(); openMarcar(b.dataset.rmBanco); }
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $("#remarcar").hidden = true; });
 
   $("#f-claim").addEventListener("submit", async e => {
     e.preventDefault(); err("#k-err", "");

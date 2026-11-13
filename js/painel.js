@@ -19,7 +19,7 @@
   const todayIso = () => M.iso(new Date());
   const roomName = id => rooms.find(r => r.id === id)?.name || "";
   const st = r => r.plano === "bloqueio" ? "bloqueio" : M.statusOf(r, C);
-  const PILL = { pendente: ["Aguardando confirmação", "p-pend"], expirada: ["Prazo vencido", "p-exp"], confirmada: ["Confirmada", "p-conf"], recusada: ["Recusada", "p-off"], cancelada: ["Cancelada", "p-off"], bloqueio: ["Bloqueio", "p-blk"] };
+  const PILL = { pendente: ["Aguardando confirmação", "p-pend"], expirada: ["Prazo vencido", "p-exp"], confirmada: ["Confirmada", "p-conf"], recusada: ["Recusada", "p-off"], cancelada: ["Cancelada", "p-cancel"], bloqueio: ["Bloqueio", "p-blk"] };
   const pill = r => { const [t, c] = PILL[st(r)]; const due = r.status === "confirmada" && r.plano !== "bloqueio" && M.dueOf(r) > 0;
     return `<span class="pill ${c}">${t}</span>${r.usa_banco_de ? `<span class="pill p-banco">Banco de horas</span>` : M.isCompraBanco(r) ? `<span class="pill p-banco">Compra de horas</span>` : ""}${due ? `<span class="pill ${atrasado(r) ? "p-late" : "p-pend"}">${atrasado(r) ? "Pagamento atrasado" : "A pagar"}</span>` : ""}`; };
   // pagamento em atraso: avulsa/período depois do dia do atendimento; horas antecipadas depois do dia 05
@@ -306,6 +306,7 @@
       if (rsFilter === "pendente" && s !== "pendente") return false;
       if (rsFilter === "confirmada" && s !== "confirmada") return false;
       if (rsFilter === "encerradas" && !["recusada", "cancelada", "expirada"].includes(s)) return false;
+      if (rsFilter === "cancelada" && s !== "cancelada") return false;
       if (rsFilter === "bloqueio" && !(s === "bloqueio" && r.status === "confirmada")) return false;
       if (rsFilter !== "bloqueio" && rsFilter !== "todas" && s === "bloqueio") return false;
       return matches(r, q);
@@ -443,6 +444,7 @@
           <dt>Horários</dt><dd><ul class="ul">${(slotsText(r).length ? slotsText(r) : ["A combinar"]).map(l => `<li>${esc(l)}</li>`).join("")}</ul></dd>
           ${isB ? "" : `<dt>Valor</dt><dd><b>${r.total ? M.money(r.total) : "—"}</b>${r.desconto_pct > 0 ? ` <span class="tag">−${r.desconto_pct}% desconto</span>` : ""}${r.total && M.dueOf(r) > 0 ? ` · em aberto ${M.money(M.dueOf(r))} (${atrasado(r) ? "atrasado" : M.dueText(r)})` : r.total ? " · pago" : ""}</dd>`}
           <dt>Pedido em</dt><dd>${M.fmtDateTime(new Date(r.created_at))}</dd>
+          ${r.status === "cancelada" ? `<dt>Cancelada</dt><dd>${r.cancelado_por === "cliente" ? "Pelo cliente" : r.cancelado_por === "clinica" ? "Pela clínica" : "—"}${r.cancelado_em || r.decided_at ? ` em ${M.fmtDateTime(new Date(r.cancelado_em || r.decided_at))}` : ""}<small class="muted"> · os horários estão livres</small></dd>` : ""}
           ${r.obs ? `<dt>Observação</dt><dd>${esc(r.obs)}</dd>` : ""}
         </dl>
       </section>
@@ -741,6 +743,25 @@
     A().toast("Acesso removido."); renderStaff();
   }
 
-  // atualiza sozinho a cada 2 minutos (novas pré-reservas)
-  setInterval(() => { if (bound && document.visibilityState === "visible" && $("#drawer").hidden) reload(); }, 120000);
+  // atualiza sozinho: na hora (Realtime), ao voltar para a aba e, por garantia, a cada 2 minutos
+  let rtTimer = null, rtOn = false;
+  async function refreshLive() {
+    if (!bound) return;
+    // não atrapalha quem está preenchendo um formulário na gaveta
+    const dr = $("#drawer"), busy = !dr.hidden && (dr.querySelector("#dr-form form, #payform") || dr.querySelector("[data-a=back]"));
+    const reopen = !dr.hidden && !busy ? dr.dataset.reopen : null;
+    await reload();
+    if (reopen) { const i = reopen.indexOf(":"), k = reopen.slice(0, i), v = reopen.slice(i + 1); k === "res" ? openRes(v) : openCliente(v); }
+  }
+  const scheduleLive = () => { clearTimeout(rtTimer); rtTimer = setTimeout(refreshLive, 700); };
+  function startRealtime() {
+    if (rtOn || !sb?.channel) return; rtOn = true;
+    sb.channel("painel-reservas")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, scheduleLive)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservation_slots" }, scheduleLive)
+      .subscribe();
+  }
+  window.addEventListener("morada:start", startRealtime);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") scheduleLive(); });
+  setInterval(() => { if (document.visibilityState === "visible") refreshLive(); }, 120000);
 })();

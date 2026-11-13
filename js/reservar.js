@@ -500,4 +500,31 @@
     $("#done").hidden = false;
     $("#done").scrollIntoView({ behavior: "smooth", block: "center" });
   });
+
+  // ---------- vindo do convite de remarcar (Minha conta): plano, horário e sala já escolhidos ----------
+  // reservar.html?sala=ID&plano=avulso|pacote|periodo&data=AAAA-MM-DD&ini=14&fim=15 (no período: &periodo=índice)
+  (async () => {
+    const q = new URLSearchParams(location.search), pl = q.get("plano"), dt = q.get("data") || "";
+    if (!pl || !/^\d{4}-\d{2}-\d{2}$/.test(dt) || dt < todayIso) return;
+    const radio = [...document.querySelectorAll('input[name="plano"]')].find(x => x.value === pl);
+    const d = M.parse(dt); if (!radio || !openOf(d)) return;
+    radio.checked = true; radio.dispatchEvent(new Event("change"));
+    week = M.monday(d);
+    if (pl === "periodo") { const pi = Number(q.get("periodo")); if (!P[pi]) return; sel.add(`${dt}|${pi}`); }
+    else {
+      const ini = Number(q.get("ini")), fim = Number(q.get("fim"));
+      if (!(fim > ini) || (ini * 2) % 1 || (fim * 2) % 1) return;
+      for (let h = ini; h < fim; h += pl === "pacote" ? 1 : 0.5) sel.add(`${dt}|${h}`);
+    }
+    if (roomById(prefId)) chosen = prefId;
+    await refresh();
+    const halves = pickedHalves();
+    const indisponivel = !chosen || chosen !== prefId || halves.some(([dd, h]) => isPast(M.parse(dd), h)) || conflitos(chosen, halves).length;
+    if (indisponivel) {
+      sel.clear(); chosen = null; await refresh();
+      $("#step-time").scrollIntoView({ behavior: "smooth", block: "start" });
+      return showErr("Esse horário acabou de ser ocupado. Escolha outro na agenda abaixo.");
+    }
+    $("#step-data").scrollIntoView({ behavior: "smooth", block: "start" });
+  })();
 })();

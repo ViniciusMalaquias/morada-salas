@@ -179,3 +179,21 @@ input[readonly] { background: rgba(56, 49, 46, .05); color: rgba(56, 49, 46, .7)
 .mc-sala.rp-busy{cursor:default}
 .mc-sala.rp-busy span{opacity:.6;border-style:dashed}
 .mc-sala.rp-busy small{color:#8a7f79;font-weight:500}
+
+/* Convite para remarcar (depois de cancelar) */
+.rm{max-width:480px}
+.rm-body{display:flex;flex-direction:column;gap:16px}
+.rm-body p{margin:0}
+.rm-head{display:flex;gap:14px;align-items:center}
+.rm-head h2{margin:0}
+.rm-ok{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:#e3efe6;color:#3f7a52;font-size:1.3rem;font-weight:700}
+.rm-pago{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px 16px;border-radius:12px;background:#f8ebe7}
+.rm-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rm-slot{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:12px;border:1.5px solid #e9e2dc;background:#fff;color:#38312e;text-decoration:none;transition:border-color .15s,background .15s}
+.rm-slot b{font-size:.92rem}
+.rm-slot span{font-size:.85rem;color:#8a7f79;font-variant-numeric:tabular-nums}
+.rm-slot:hover,.rm-slot:focus-visible{border-color:#ce8b7e;background:#f8ebe7}
+.rm-actions{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:4px}
+.rm-actions .btn{width:100%}
+.rm-later{align-self:center;color:#8a7f79;font-size:.9rem}
+@media (max-width:420px){.rm-slots{grid-template-columns:1fr}}
